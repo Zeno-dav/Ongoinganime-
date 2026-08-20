@@ -74,6 +74,7 @@ col_files = db["files"]
 col_users = db["users"]
 col_fsub = db["fsub"]
 col_settings = db["settings"]
+col_sessions = db["sessions"]  # Persistent storage for active sessions & cleanups
 
 if not col_settings.find_one({"key": "config"}):
     col_settings.insert_one({
@@ -90,11 +91,84 @@ def get_setting(field):
 def update_setting(field, val):
     col_settings.update_one({"key": "config"}, {"$set": {field: str(val)}}, upsert=True)
 
-user_cache = {}
+# ================= PERSISTENT SESSION HELPERS =================
+def get_session(user_id):
+    return col_sessions.find_one({"user_id": user_id}) or {}
+
+def update_session(user_id, update_dict):
+    col_sessions.update_one({"user_id": user_id}, {"$set": update_dict}, upsert=True)
+
+def clear_session(user_id):
+    col_sessions.update_one({"user_id": user_id}, {"$set": {"series_id": None, "files": {}, "audio": None, "ep_num": None}})
+
+# ================= ZERO-CLUTTER MESSAGE PURGE SYSTEM =================
+def track_message(chat_id, message_id):
+    """Tracks every bot and user message ID in MongoDB for reliable batch deletion."""
+    col_sessions.update_one(
+        {"user_id": chat_id},
+        {"$addToSet": {"msg_history": message_id}},
+        upsert=True
+    )
+
+def clean_screen(chat_id, text, reply_markup=None, photo=None):
+    """Deletes ALL prior tracked messages and displays a fresh view."""
+    try:
+        bot.clear_step_handler_by_chat_id(chat_id=chat_id)
+    except Exception:
+        pass
+
+    session = get_session(chat_id)
+    history = session.get("msg_history", [])
+    
+    # Delete all previous messages in chat history
+    for mid in history:
+        try:
+            bot.delete_message(chat_id, mid)
+        except Exception:
+            pass
+
+    col_sessions.update_one({"user_id": chat_id}, {"$set": {"msg_history": []}})
+
+    # Render fresh screen
+    if photo:
+        try:
+            sent = bot.send_photo(chat_id, photo=photo, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+        except Exception:
+            sent = bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        sent = bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
+
+    track_message(chat_id, sent.message_id)
+    return sent
+
+def remove_user_msg(message):
+    """Deletes incoming user message immediately and adds to history queue."""
+    track_message(message.chat.id, message.message_id)
+    try:
+        bot.delete_message(message.chat.id, message.message_id)
+    except Exception:
+        pass
+
+def parse_target_chat(chat_identifier):
+    chat_str = str(chat_identifier).strip()
+    if chat_str.startswith("-100") or chat_str.startswith("-") or chat_str.isdigit():
+        try:
+            return int(chat_str)
+        except ValueError:
+            return chat_str
+    return chat_str
+
+def get_channel_title(chat_identifier):
+    if not chat_identifier:
+        return "Not Configured ❌"
+    try:
+        chat = bot.get_chat(parse_target_chat(chat_identifier))
+        return f"{chat.title} (<code>{chat.id}</code>)"
+    except Exception:
+        return f"<code>{chat_identifier}</code>"
 
 # ================= ADMIN DIRECT ERROR NOTIFIER =================
 def notify_admin_error(context, error_obj):
-    """Logs the issue and delivers an immediate notification to the Admin DM."""
     err_str = str(error_obj)
     logger.error(f"[SYSTEM ALERT] {context}: {err_str}")
     try:
@@ -106,76 +180,7 @@ def notify_admin_error(context, error_obj):
         )
         bot.send_message(ADMIN_ID, alert_text, parse_mode="HTML")
     except Exception as e:
-        logger.error(f"Failed to send error notification to admin DM: {e}")
-
-# ================= CLEAN UI & MESSAGE HANDLERS =================
-def clean_screen(chat_id, text, reply_markup=None):
-    """Deletes previous screen and sends the next page cleanly."""
-    try:
-        bot.clear_step_handler_by_chat_id(chat_id=chat_id)
-    except Exception:
-        pass
-
-    if chat_id in user_cache and "active_msg_id" in user_cache[chat_id]:
-        try:
-            bot.delete_message(chat_id, user_cache[chat_id]["active_msg_id"])
-        except Exception:
-            pass
-
-    sent = bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
-    if chat_id not in user_cache:
-        user_cache[chat_id] = {}
-    user_cache[chat_id]["active_msg_id"] = sent.message_id
-    return sent
-
-def clean_screen_photo(chat_id, photo, caption, reply_markup=None):
-    """Deletes previous screen and renders photo."""
-    try:
-        bot.clear_step_handler_by_chat_id(chat_id=chat_id)
-    except Exception:
-        pass
-
-    if chat_id in user_cache and "active_msg_id" in user_cache[chat_id]:
-        try:
-            bot.delete_message(chat_id, user_cache[chat_id]["active_msg_id"])
-        except Exception:
-            pass
-
-    try:
-        sent = bot.send_photo(chat_id, photo=photo, caption=caption, reply_markup=reply_markup, parse_mode="HTML")
-    except Exception:
-        sent = bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
-
-    if chat_id not in user_cache:
-        user_cache[chat_id] = {}
-    user_cache[chat_id]["active_msg_id"] = sent.message_id
-    return sent
-
-def remove_user_msg(message):
-    try:
-        bot.delete_message(message.chat.id, message.message_id)
-    except Exception:
-        pass
-
-def parse_target_chat(chat_identifier):
-    """Converts channel string ID or integer to valid telegram target."""
-    chat_str = str(chat_identifier).strip()
-    if chat_str.startswith("-100") or chat_str.startswith("-") or chat_str.isdigit():
-        try:
-            return int(chat_str)
-        except ValueError:
-            return chat_str
-    return chat_str
-
-def get_channel_title(chat_identifier):
-    """Fetches human-readable channel title if accessible, otherwise falls back to ID."""
-    if not chat_identifier:
-        return "Not Configured ❌"
-    try:
-        chat = bot.get_chat(parse_target_chat(chat_identifier))
-        return f"{chat.title} (<code>{chat.id}</code>)"
-    except Exception:
-        return f"<code>{chat_identifier}</code>"
+        logger.error(f"Failed to deliver DM alert: {e}")
 
 # ================= HELPER & BACKGROUND TASKS =================
 def is_admin(user_id):
@@ -205,7 +210,7 @@ def check_fsub(user_id):
             if m.status not in ["creator", "administrator", "member"]:
                 unsubbed.append({"title": ch["title"], "link": ch["invite_link"]})
         except Exception as e:
-            notify_admin_error(f"Force-Sub Verification Failed for Channel {ch.get('title')}", e)
+            notify_admin_error(f"Force-Sub Check Error ({ch.get('title')})", e)
     return len(unsubbed) == 0, unsubbed
 
 def get_fsub_keyboard(unsubbed, start_param=""):
@@ -223,10 +228,10 @@ def extract_file(message):
         return message.document.file_id, "document", message.document.file_name or "Anime_Episode.mkv"
     return None, None, None
 
-# ================= AUTO ID EXTRACTOR =================
+# ================= AUTO CHANNEL ID EXTRACTOR =================
 @bot.message_handler(func=lambda msg: is_admin(msg.chat.id) and msg.forward_from_chat is not None)
 def handle_forwarded_channel_id(message):
-    """Automatically extracts Channel ID when admin forwards a message from any channel."""
+    remove_user_msg(message)
     ch_id = message.forward_from_chat.id
     ch_title = message.forward_from_chat.title
     ch_username = f"@{message.forward_from_chat.username}" if message.forward_from_chat.username else "Private Channel"
@@ -237,7 +242,7 @@ def handle_forwarded_channel_id(message):
         f"📌 <b>Title:</b> {ch_title}\n"
         f"🆔 <b>Channel ID:</b> <code>{ch_id}</code>\n"
         f"🔗 <b>Username:</b> {ch_username}\n\n"
-        f"<i>Copy this ID and paste it in Bot Settings or Series Channel ID!</i>"
+        f"<i>Copy this ID and paste it into Bot Settings or Series Channel ID!</i>"
     )
 
 # ================= USER /START & FILE RETRIEVAL =================
@@ -260,7 +265,7 @@ def handle_start(message):
         )
         return
 
-    # Deep Link File Delivery
+    # Deep Link File Retrieval
     if start_param.startswith("file_"):
         file_doc = col_files.find_one({"file_key": start_param})
         if file_doc:
@@ -278,7 +283,7 @@ def handle_start(message):
             clean_screen(u, "❌ <b>This download link is expired or does not exist.</b>")
         return
 
-    # Standard User Interface
+    # Main Hub
     brand = get_setting("brand_name")
     kb = types.InlineKeyboardMarkup()
     if is_admin(u):
@@ -326,7 +331,7 @@ def handle_retry(call):
     else:
         bot.answer_callback_query(call.id, "❌ You have not joined all required channels yet!", show_alert=True)
 
-# ================= ADMIN CONTROL PANEL =================
+# ================= ADMIN DASHBOARD =================
 @bot.message_handler(commands=["admin"])
 def handle_admin_cmd(message):
     remove_user_msg(message)
@@ -342,6 +347,7 @@ def cb_admin_hub(call):
     show_admin_panel(call.message.chat.id)
 
 def show_admin_panel(chat_id):
+    clear_session(chat_id)
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
         StyledInlineKeyboardButton(text="🔍 Smart Title Finder", callback_data="admin_search_series", style="primary"),
@@ -394,7 +400,7 @@ def step_save_brand(message):
 def start_edit_main_ch(call):
     bot.answer_callback_query(call.id)
     u = call.message.chat.id
-    msg = clean_screen(u, "<b>Send NEW Main Channel ID:</b>\nMust start with <code>-100</code> (e.g. <code>-100219047xxxx</code>)\n\n<i>Tip: Forward any message from the channel to get its ID automatically!</i>")
+    msg = clean_screen(u, "<b>Send NEW Main Channel ID:</b>\nMust start with <code>-100</code> (e.g. <code>-100219047xxxx</code>)\n\n<i>Tip: Forward any message from that channel to get its ID automatically!</i>")
     bot.register_next_step_handler(msg, step_save_main_ch)
 
 def step_save_main_ch(message):
@@ -522,7 +528,7 @@ def show_series_action_hub(call):
         StyledInlineKeyboardButton(text="🗑️ Delete Series", callback_data=f"del_s_{sid}", style="danger"),
         StyledInlineKeyboardButton(text="🔙 Back to Series List", callback_data="admin_series_hub", style="danger")
     )
-    clean_screen_photo(call.message.chat.id, photo=s["banner"], caption=caption, reply_markup=kb)
+    clean_screen(call.message.chat.id, caption, reply_markup=kb, photo=s["banner"])
 
 # --- Metadata Editors ---
 @bot.callback_query_handler(func=lambda c: c.data.startswith("edit_title_"))
@@ -530,7 +536,7 @@ def handle_edit_title(call):
     bot.answer_callback_query(call.id)
     u = call.message.chat.id
     sid = call.data.replace("edit_title_", "")
-    user_cache[u] = {"edit_sid": sid}
+    update_session(u, {"edit_sid": sid})
     
     msg = clean_screen(u, "✏️ <b>Enter NEW Series Title:</b>")
     bot.register_next_step_handler(msg, step_save_new_title)
@@ -538,13 +544,13 @@ def handle_edit_title(call):
 def step_save_new_title(message):
     remove_user_msg(message)
     u = message.chat.id
-    if u not in user_cache or "edit_sid" not in user_cache[u]:
+    sid = get_session(u).get("edit_sid")
+    if not sid:
+        show_admin_panel(u)
         return
-    sid = user_cache[u]["edit_sid"]
-    new_title = message.text.strip()
 
+    new_title = message.text.strip()
     col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"title": new_title}})
-    user_cache.pop(u, None)
     show_series_action_hub(types.CallbackQuery(id="", from_user=message.from_user, data=f"manage_s_{sid}", message=message, chat_instance="", json_string=""))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("edit_season_"))
@@ -552,7 +558,7 @@ def handle_edit_season(call):
     bot.answer_callback_query(call.id)
     u = call.message.chat.id
     sid = call.data.replace("edit_season_", "")
-    user_cache[u] = {"edit_sid": sid}
+    update_session(u, {"edit_sid": sid})
     
     msg = clean_screen(u, "🎯 <b>Send NEW Season Number & Total Episodes:</b>\n\nFormat: <code>Season | Total Episodes</code>\nExample: <code>02 | 24</code> or <code>03 | ONGOING</code>")
     bot.register_next_step_handler(msg, step_save_new_season)
@@ -560,10 +566,11 @@ def handle_edit_season(call):
 def step_save_new_season(message):
     remove_user_msg(message)
     u = message.chat.id
-    if u not in user_cache or "edit_sid" not in user_cache[u]:
+    sid = get_session(u).get("edit_sid")
+    if not sid:
+        show_admin_panel(u)
         return
-    sid = user_cache[u]["edit_sid"]
-    
+
     parts = (message.text or "").split("|")
     new_season = parts[0].strip().zfill(2)
     new_total = parts[1].strip().upper() if len(parts) > 1 else "ONGOING"
@@ -572,7 +579,6 @@ def step_save_new_season(message):
         {"_id": ObjectId(sid)},
         {"$set": {"season": new_season, "total_episodes": new_total, "status": "ONGOING"}}
     )
-    user_cache.pop(u, None)
     show_series_action_hub(types.CallbackQuery(id="", from_user=message.from_user, data=f"manage_s_{sid}", message=message, chat_instance="", json_string=""))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("edit_chid_"))
@@ -580,21 +586,21 @@ def handle_edit_chid(call):
     bot.answer_callback_query(call.id)
     u = call.message.chat.id
     sid = call.data.replace("edit_chid_", "")
-    user_cache[u] = {"edit_sid": sid}
+    update_session(u, {"edit_sid": sid})
     
-    msg = clean_screen(u, "📢 <b>Enter NEW Dedicated Channel ID:</b>\nMust start with <code>-100</code> (e.g. <code>-100219047xxxx</code>)\n\n<i>Tip: Forward any message from the channel to get its exact ID.</i>")
+    msg = clean_screen(u, "📢 <b>Enter NEW Dedicated Channel ID:</b>\nMust start with <code>-100</code> (e.g. <code>-100219047xxxx</code>)\n\n<i>Tip: Forward any message from the channel to get its ID automatically!</i>")
     bot.register_next_step_handler(msg, step_save_new_chid)
 
 def step_save_new_chid(message):
     remove_user_msg(message)
     u = message.chat.id
-    if u not in user_cache or "edit_sid" not in user_cache[u]:
+    sid = get_session(u).get("edit_sid")
+    if not sid:
+        show_admin_panel(u)
         return
-    sid = user_cache[u]["edit_sid"]
-    ch_text = message.text.strip()
 
+    ch_text = message.text.strip()
     col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"channel_id": ch_text}})
-    user_cache.pop(u, None)
     show_series_action_hub(types.CallbackQuery(id="", from_user=message.from_user, data=f"manage_s_{sid}", message=message, chat_instance="", json_string=""))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("edit_banner_"))
@@ -602,7 +608,7 @@ def handle_edit_banner(call):
     bot.answer_callback_query(call.id)
     u = call.message.chat.id
     sid = call.data.replace("edit_banner_", "")
-    user_cache[u] = {"edit_sid": sid}
+    update_session(u, {"edit_sid": sid})
     
     msg = clean_screen(u, "🖼️ <b>Upload NEW Poster Banner Image:</b>")
     bot.register_next_step_handler(msg, step_save_new_banner)
@@ -610,14 +616,14 @@ def handle_edit_banner(call):
 def step_save_new_banner(message):
     remove_user_msg(message)
     u = message.chat.id
-    if u not in user_cache or "edit_sid" not in user_cache[u]:
+    sid = get_session(u).get("edit_sid")
+    if not sid:
+        show_admin_panel(u)
         return
-    sid = user_cache[u]["edit_sid"]
-    
+
     if message.photo:
         banner = message.photo[-1].file_id
         col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"banner": banner}})
-        user_cache.pop(u, None)
         show_series_action_hub(types.CallbackQuery(id="", from_user=message.from_user, data=f"manage_s_{sid}", message=message, chat_instance="", json_string=""))
     else:
         msg = clean_screen(u, "⚠️ Please upload a valid image:")
@@ -670,7 +676,7 @@ def handle_delete_series(call):
     col_episodes.delete_many({"series_id": sid})
     show_admin_panel(call.message.chat.id)
 
-# ================= EPISODE UPLOAD FLOW (WITH CHANNEL PREVIEW) =================
+# ================= EPISODE UPLOAD FLOW (ZERO RESET BUG) =================
 @bot.callback_query_handler(func=lambda c: c.data.startswith("start_upload_"))
 def handle_start_upload(call):
     bot.answer_callback_query(call.id)
@@ -678,16 +684,21 @@ def handle_start_upload(call):
     sid = call.data.replace("start_upload_", "")
     s = col_series.find_one({"_id": ObjectId(sid)})
     
-    user_cache[u] = {"series": s, "files": {}}
-    main_ch = get_setting("main_channel_id")
+    # Save active series ID persistently to DB session
+    update_session(u, {
+        "series_id": sid,
+        "files": {},
+        "audio": None,
+        "ep_num": None
+    })
     
-    # Clearly displays destination channels before prompting for episode number
+    main_ch = get_setting("main_channel_id")
     destination_preview = (
         f"Selected: <b>{s['title']}</b> (Season {s.get('season', '01')})\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📢 <b>Broadcast Channels Target:</b>\n"
+        f"📢 <b>Broadcast Target Channels:</b>\n"
         f"• <b>Series Channel:</b> {get_channel_title(s.get('channel_id'))}\n"
-        f"• <b>Main Channel:</b> {get_channel_title(main_ch)}\n"
+        f"• <b>Main Updates Channel:</b> {get_channel_title(main_ch)}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"<b>Send Episode Number: (e.g. 01, 07)</b>"
     )
@@ -697,12 +708,13 @@ def handle_start_upload(call):
 def step_get_ep_number(message):
     remove_user_msg(message)
     u = message.chat.id
-    if u not in user_cache or "series" not in user_cache[u]:
+    session = get_session(u)
+    if not session.get("series_id"):
         show_admin_panel(u)
         return
 
     ep_num = (message.text or "01").strip().zfill(2)
-    user_cache[u]["ep_num"] = ep_num
+    update_session(u, {"ep_num": ep_num})
 
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
@@ -717,43 +729,63 @@ def step_get_ep_number(message):
 def handle_audio_choice(call):
     bot.answer_callback_query(call.id)
     u = call.message.chat.id
-    if u not in user_cache:
-        show_admin_panel(u)
-        return
-
+    
     mapping = {
         "set_audio_jap": "Japanese [Eng-Sub]",
         "set_audio_dual": "Dual Audio [Hindi + Jap]",
         "set_audio_multi": "Multi Audio [Multi-Lang]",
         "set_audio_eng": "English [Sub/Dub]"
     }
-    user_cache[u]["audio"] = mapping.get(call.data, "Japanese [Eng-Sub]")
+    selected_audio = mapping.get(call.data, "Japanese [Eng-Sub]")
+    
+    # Save audio permanently to DB session
+    update_session(u, {"audio": selected_audio})
     start_quality_upload_flow(u, "480p", "1/4")
 
 def start_quality_upload_flow(chat_id, quality, step_label):
     bot.clear_step_handler_by_chat_id(chat_id=chat_id)
     
-    audio = user_cache.get(chat_id, {}).get("audio", "Unknown")
+    session = get_session(chat_id)
+    sid = session.get("series_id")
+    s = col_series.find_one({"_id": ObjectId(sid)}) if sid else {}
+    
+    audio = session.get("audio", "Default Audio")
+    ep_num = session.get("ep_num", "01")
+    main_ch = get_setting("main_channel_id")
+
     kb = types.InlineKeyboardMarkup()
     kb.add(StyledInlineKeyboardButton(text=f"⏩ Skip {quality}", callback_data=f"skip_{quality}", style="danger"))
     
-    text = f"Audio: <b>{audio}</b>\n\n📁 <b>Step {step_label}: Forward / Send {quality} File:</b>"
+    text = (
+        f"📺 <b>{s.get('title', 'Anime')}</b> (S{s.get('season', '01')}E{ep_num})\n"
+        f"🔊 <b>Audio:</b> <code>{audio}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📢 <b>Target Channels:</b>\n"
+        f"• <b>Series:</b> {get_channel_title(s.get('channel_id'))}\n"
+        f"• <b>Main:</b> {get_channel_title(main_ch)}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📁 <b>Step {step_label}: Forward / Send {quality} File:</b>"
+    )
     msg = clean_screen(chat_id, text, reply_markup=kb)
     bot.register_next_step_handler(msg, process_quality_file, quality)
 
 def process_quality_file(message, quality):
     remove_user_msg(message)
     u = message.chat.id
-    if u not in user_cache:
+    session = get_session(u)
+    if not session.get("series_id"):
+        show_admin_panel(u)
         return
 
     file_id, file_type, file_name = extract_file(message)
     if file_id:
-        user_cache[u]["files"][quality] = {
+        current_files = session.get("files", {})
+        current_files[quality] = {
             "file_id": file_id,
             "file_type": file_type,
             "file_name": file_name
         }
+        update_session(u, {"files": current_files})
 
     advance_next_quality(u, quality)
 
@@ -777,19 +809,26 @@ def advance_next_quality(chat_id, current_quality):
     else:
         finalize_and_publish_episode(chat_id)
 
-# ================= FINALIZE, PUBLISH & ADMIN ERROR DISPATCH =================
+# ================= FINALIZE, PUBLISH & ADMIN ALERTS =================
 def finalize_and_publish_episode(chat_id):
     bot.clear_step_handler_by_chat_id(chat_id=chat_id)
-    data = user_cache.get(chat_id)
-    if not data or not data.get("files"):
+    session = get_session(chat_id)
+    files = session.get("files", {})
+
+    if not files:
         clean_screen(chat_id, "⚠️ <b>Notice:</b> All qualities were skipped. At least 1 file is required to broadcast.")
-        user_cache.pop(chat_id, None)
+        clear_session(chat_id)
         return
 
-    series = data["series"]
-    ep_num = data["ep_num"]
-    audio = data["audio"]
-    files = data["files"]
+    sid = session.get("series_id")
+    series = col_series.find_one({"_id": ObjectId(sid)})
+    if not series:
+        clean_screen(chat_id, "❌ Series record not found!")
+        clear_session(chat_id)
+        return
+
+    ep_num = session.get("ep_num", "01")
+    audio = session.get("audio", "Default Audio")
     bot_username = get_setting("bot_username")
     main_ch_raw = get_setting("main_channel_id")
     target_ch_raw = series.get("channel_id")
@@ -864,7 +903,7 @@ def finalize_and_publish_episode(chat_id):
         notify_admin_error("Main Channel Broadcast Skipped", err_text)
         errors_encountered.append(f"• <b>Main Updates Channel:</b> {err_text}")
 
-    # 4. Record Episode in DB
+    # 4. Record Episode in Database
     col_episodes.insert_one({
         "series_id": str(series["_id"]),
         "season": series.get("season", "01"),
@@ -873,7 +912,7 @@ def finalize_and_publish_episode(chat_id):
         "created_at": time.time()
     })
 
-    user_cache.pop(chat_id, None)
+    clear_session(chat_id)
     
     kb = types.InlineKeyboardMarkup()
     kb.add(StyledInlineKeyboardButton(text="🎬 Upload Another Episode", callback_data="admin_upload_ep", style="success"))
@@ -898,7 +937,7 @@ def finalize_and_publish_episode(chat_id):
 def start_add_series(call):
     bot.answer_callback_query(call.id)
     u = call.message.chat.id
-    user_cache[u] = {}
+    update_session(u, {"new_s": {}})
     kb = types.InlineKeyboardMarkup()
     kb.add(StyledInlineKeyboardButton(text="🔙 Cancel", callback_data="admin_hub", style="danger"))
     msg = clean_screen(u, "➕ <b>Add New Series (Step 1/5)</b>\n\nEnter Series Title:", reply_markup=kb)
@@ -910,29 +949,45 @@ def step_as_title(message):
     if not message.text or message.text == "/cancel":
         show_admin_panel(u)
         return
-    user_cache[u]["title"] = message.text.strip()
-    msg = clean_screen(u, f"➕ <b>{user_cache[u]['title']}</b> (Step 2/5)\n\nEnter Season Number (e.g. <code>01</code>, <code>02</code>):")
+    session = get_session(u)
+    new_s = session.get("new_s", {})
+    new_s["title"] = message.text.strip()
+    update_session(u, {"new_s": new_s})
+
+    msg = clean_screen(u, f"➕ <b>{new_s['title']}</b> (Step 2/5)\n\nEnter Season Number (e.g. <code>01</code>, <code>02</code>):")
     bot.register_next_step_handler(msg, step_as_season)
 
 def step_as_season(message):
     remove_user_msg(message)
     u = message.chat.id
-    user_cache[u]["season"] = (message.text or "01").strip().zfill(2)
-    msg = clean_screen(u, f"➕ <b>{user_cache[u]['title']}</b> (Step 3/5)\n\nEnter Total Episodes (e.g. <code>12</code>, <code>24</code>, or <code>ONGOING</code>):")
+    session = get_session(u)
+    new_s = session.get("new_s", {})
+    new_s["season"] = (message.text or "01").strip().zfill(2)
+    update_session(u, {"new_s": new_s})
+
+    msg = clean_screen(u, f"➕ <b>{new_s['title']}</b> (Step 3/5)\n\nEnter Total Episodes (e.g. <code>12</code>, <code>24</code>, or <code>ONGOING</code>):")
     bot.register_next_step_handler(msg, step_as_total)
 
 def step_as_total(message):
     remove_user_msg(message)
     u = message.chat.id
-    user_cache[u]["total_episodes"] = (message.text or "ONGOING").strip().upper()
-    msg = clean_screen(u, f"➕ <b>{user_cache[u]['title']}</b> (Step 4/5)\n\nEnter Dedicated Series Channel ID:\nMust start with <code>-100</code> (e.g. <code>-100219047xxxx</code>)\n\n<i>Tip: Forward any message from that channel to get the exact ID automatically!</i>")
+    session = get_session(u)
+    new_s = session.get("new_s", {})
+    new_s["total_episodes"] = (message.text or "ONGOING").strip().upper()
+    update_session(u, {"new_s": new_s})
+
+    msg = clean_screen(u, f"➕ <b>{new_s['title']}</b> (Step 4/5)\n\nEnter Dedicated Series Channel ID:\nMust start with <code>-100</code> (e.g. <code>-100219047xxxx</code>)\n\n<i>Tip: Forward any message from that channel to get its ID automatically!</i>")
     bot.register_next_step_handler(msg, step_as_channel)
 
 def step_as_channel(message):
     remove_user_msg(message)
     u = message.chat.id
-    user_cache[u]["channel_id"] = (message.text or "").strip()
-    msg = clean_screen(u, f"➕ <b>{user_cache[u]['title']}</b> (Step 5/5)\n\nSend Poster Banner Image:")
+    session = get_session(u)
+    new_s = session.get("new_s", {})
+    new_s["channel_id"] = (message.text or "").strip()
+    update_session(u, {"new_s": new_s})
+
+    msg = clean_screen(u, f"➕ <b>{new_s['title']}</b> (Step 5/5)\n\nSend Poster Banner Image:")
     bot.register_next_step_handler(msg, step_as_banner)
 
 def step_as_banner(message):
@@ -944,23 +999,25 @@ def step_as_banner(message):
         bot.register_next_step_handler(msg, step_as_banner)
         return
 
-    data = user_cache.get(u, {})
-    new_series = {
-        "title": data["title"],
-        "season": data["season"],
-        "total_episodes": data["total_episodes"],
-        "channel_id": data["channel_id"],
+    session = get_session(u)
+    new_s = session.get("new_s", {})
+    
+    new_series_doc = {
+        "title": new_s["title"],
+        "season": new_s["season"],
+        "total_episodes": new_s["total_episodes"],
+        "channel_id": new_s["channel_id"],
         "banner": banner,
         "status": "ONGOING",
         "created_at": time.time()
     }
-    inserted = col_series.insert_one(new_series)
-    user_cache.pop(u, None)
+    inserted = col_series.insert_one(new_series_doc)
+    clear_session(u)
     
     kb = types.InlineKeyboardMarkup()
     kb.add(StyledInlineKeyboardButton(text="🎬 Upload First Episode", callback_data=f"start_upload_{str(inserted.inserted_id)}", style="success"))
     kb.add(StyledInlineKeyboardButton(text="🔙 Dashboard", callback_data="admin_hub", style="danger"))
-    clean_screen(u, f"✅ <b>Series '{new_series['title']}' created successfully!</b>", reply_markup=kb)
+    clean_screen(u, f"✅ <b>Series '{new_series_doc['title']}' created successfully!</b>", reply_markup=kb)
 
 # ================= FORCE-SUB & BROADCAST =================
 @bot.callback_query_handler(func=lambda c: c.data == "admin_fsub_hub")
@@ -1029,7 +1086,7 @@ def execute_broadcast(message):
                 bot.copy_message(chat_id=uid, from_chat_id=u, message_id=message.message_id)
                 success += 1
                 time.sleep(0.05)
-            except Exception as e:
+            except Exception:
                 failed += 1
         clean_screen(u, f"✅ <b>Broadcast Completed!</b>\n\n🟢 Successful: <b>{success}</b>\n🔴 Failed / Blocked: <b>{failed}</b>")
 
