@@ -60,6 +60,12 @@ if not BOT_TOKEN or not MONGO_URI:
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
+try:
+    BOT_ME = bot.get_me()
+    DETECTED_BOT_USERNAME = BOT_ME.username
+except Exception:
+    DETECTED_BOT_USERNAME = "ongoing_anime_by_zenobot"
+
 # ================= MONGODB SETUP =================
 try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
@@ -85,7 +91,9 @@ if not col_settings.find_one({"key": "config"}):
         "key": "config",
         "brand_name": "@ongoing_anime_by_zeno",
         "main_channel_id": "",
-        "bot_username": "ongoing_anime_by_zenobot",
+        "download_channel_link": "",
+        "button_mode": "bot", # 'bot' or 'channel'
+        "bot_username": DETECTED_BOT_USERNAME,
         "protect_content": "False"
     })
 
@@ -96,24 +104,26 @@ def get_setting(field):
 def update_setting(field, val):
     col_settings.update_one({"key": "config"}, {"$set": {field: str(val)}}, upsert=True)
 
+def get_active_bot_username():
+    un = get_setting("bot_username")
+    return un if un else DETECTED_BOT_USERNAME
+
 # ================= FONT STYLIZERS (𝐀𝐁𝐂𝐃 & ᴀʙᴄᴅ) =================
 def to_bold_serif(text: str) -> str:
-    """Converts text into 𝐀𝐁𝐂𝐃 / 𝐚𝐛𝐜𝐝 styled bold serif."""
     result = []
     for char in str(text):
         code = ord(char)
-        if 65 <= code <= 90:  # A-Z
+        if 65 <= code <= 90:
             result.append(chr(0x1D400 + (code - 65)))
-        elif 97 <= code <= 122:  # a-z
+        elif 97 <= code <= 122:
             result.append(chr(0x1D41A + (code - 97)))
-        elif 48 <= code <= 57:  # 0-9
+        elif 48 <= code <= 57:
             result.append(chr(0x1D7CE + (code - 48)))
         else:
             result.append(char)
     return "".join(result)
 
 def to_small_caps(text: str) -> str:
-    """Converts text into ᴀʙᴄᴅ small caps font."""
     normal = "abcdefghijklmnopqrstuvwxyz"
     small_caps = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ"
     trans = str.maketrans(normal, small_caps)
@@ -137,6 +147,70 @@ def is_vip(user_id):
     if vip_entry.get("is_lifetime", False):
         return True
     return vip_entry.get("expires_at", 0) > time.time()
+
+# ================= SMART PRIVATE CHANNEL LINK RESOLVER =================
+def get_safe_channel_link(chat_identifier):
+    """
+    Converts any Private Channel ID / Username into a 100% accessible Invite Link.
+    This prevents Telegram's 'Not Available' error completely.
+    """
+    if not chat_identifier:
+        return None
+    try:
+        chat = bot.get_chat(chat_identifier)
+        if chat.username:
+            return f"https://t.me/{chat.username}"
+        if chat.invite_link:
+            return chat.invite_link
+        return bot.export_chat_invite_link(chat.id)
+    except Exception as e:
+        logger.error(f"Failed to generate safe invite link for {chat_identifier}: {e}")
+        return None
+
+def resolve_channel_input(raw_input):
+    val = str(raw_input).strip()
+    if not val:
+        return False, None, None, None, "Input cannot be empty!"
+
+    # 1. Check for Private Post Link (t.me/c/123456789/10)
+    c_match = re.search(r't\.me/c/(\d+)', val)
+    if c_match:
+        extracted_id = int(f"-100{c_match.group(1)}")
+        safe_link = get_safe_channel_link(extracted_id) or val
+        try:
+            chat = bot.get_chat(extracted_id)
+            return True, extracted_id, chat.title, safe_link, None
+        except Exception:
+            return True, extracted_id, f"Private Channel ({extracted_id})", safe_link, None
+
+    # 2. Check for Numeric ID (-100xxx)
+    if val.startswith("-100") or val.startswith("-") or val.isdigit():
+        try:
+            full_id = int(val) if str(val).startswith("-") else int(f"-100{val}")
+            safe_link = get_safe_channel_link(full_id) or "https://t.me"
+            try:
+                chat = bot.get_chat(full_id)
+                return True, full_id, chat.title, safe_link, None
+            except Exception:
+                return True, full_id, f"Channel ({full_id})", safe_link, None
+        except ValueError:
+            pass
+
+    # 3. Check for Direct Invite Link (t.me/+...)
+    if "t.me/+" in val or "t.me/joinchat/" in val:
+        return True, val, "Invite Link Channel", val, None
+
+    # 4. Check for Public Link / Username
+    pub_match = re.search(r't\.me/([a-zA-Z0-9_]+)', val)
+    username = pub_match.group(1) if pub_match else val
+    if not username.startswith("@") and not username.startswith("-"):
+        username = f"@{username}"
+
+    try:
+        chat = bot.get_chat(username)
+        return True, chat.id, chat.title, f"https://t.me/{chat.username}", None
+    except Exception as e:
+        return False, None, None, None, f"❌ Access Error: <code>{e}</code>"
 
 # ================= ANILIST AUTO-FETCHER =================
 def fetch_anilist_data(query_text):
@@ -193,7 +267,7 @@ def clear_session(user_id):
         upsert=True
     )
 
-# ================= ZERO-CLUTTER MESSAGE PURGE SYSTEM =================
+# ================= ZERO-CLUTTER PURGE SYSTEM =================
 def track_message(chat_id, message_id):
     col_sessions.update_one(
         {"user_id": chat_id},
@@ -235,50 +309,6 @@ def remove_user_msg(message):
         bot.delete_message(message.chat.id, message.message_id)
     except Exception:
         pass
-
-# ================= SMART CHANNEL RESOLVER =================
-def resolve_channel_input(raw_input):
-    val = str(raw_input).strip()
-    if not val:
-        return False, None, None, "Input cannot be empty!"
-
-    c_match = re.search(r't\.me/c/(\d+)', val)
-    if c_match:
-        extracted_id = int(f"-100{c_match.group(1)}")
-        try:
-            chat = bot.get_chat(extracted_id)
-            return True, extracted_id, chat.title, None
-        except Exception:
-            return True, extracted_id, f"Private Channel ({extracted_id})", None
-
-    if val.startswith("-100") or val.startswith("-") or val.isdigit():
-        try:
-            full_id = int(val) if str(val).startswith("-") else int(f"-100{val}")
-            try:
-                chat = bot.get_chat(full_id)
-                return True, full_id, chat.title, None
-            except Exception:
-                return True, full_id, f"Channel ({full_id})", None
-        except ValueError:
-            pass
-
-    if "t.me/+" in val or "t.me/joinchat/" in val:
-        err_msg = (
-            "❌ <b>Invite Links cannot be converted directly by Telegram API.</b>\n\n"
-            "💡 <b>Solution:</b> Post link copy karein (Format: <code>https://t.me/c/...</code>)!"
-        )
-        return False, None, None, err_msg
-
-    pub_match = re.search(r't\.me/([a-zA-Z0-9_]+)', val)
-    username = pub_match.group(1) if pub_match else val
-    if not username.startswith("@") and not username.startswith("-"):
-        username = f"@{username}"
-
-    try:
-        chat = bot.get_chat(username)
-        return True, chat.id, chat.title, None
-    except Exception as e:
-        return False, None, None, f"❌ <b>Could not access channel `{username}`.</b>\nError: <code>{e}</code>"
 
 def get_channel_title(chat_identifier):
     if not chat_identifier:
@@ -350,13 +380,15 @@ def handle_forwarded_channel_id(message):
     remove_user_msg(message)
     ch_id = message.forward_from_chat.id
     ch_title = message.forward_from_chat.title
+    safe_link = get_safe_channel_link(ch_id) or "Private ID Stored"
     
     clean_screen(
         message.chat.id,
-        f"📢 <b>Forwarded Channel ID Detected:</b>\n\n"
+        f"📢 <b>Forwarded Channel Detected:</b>\n\n"
         f"📌 <b>Title:</b> {ch_title}\n"
-        f"🆔 <b>Numeric Channel ID:</b> <code>{ch_id}</code>\n\n"
-        f"<i>Copied automatically! You can paste this ID anytime.</i>"
+        f"🆔 <b>Numeric ID:</b> <code>{ch_id}</code>\n"
+        f"🔗 <b>Safe Invite Link:</b> <code>{safe_link}</code>\n\n"
+        f"<i>Copied automatically! You can use this ID/Link in buttons.</i>"
     )
 
 # ================= USER /START & FILE RETRIEVAL =================
@@ -403,7 +435,7 @@ def handle_start(message):
                     protect_content=is_protected
                 )
 
-            # 2. SEND NOTICE SECOND (VIP gets permanent notice, Free gets 30m auto-delete)
+            # 2. SEND NOTICE SECOND
             if user_is_vip:
                 bot.send_message(
                     chat_id=u,
@@ -419,7 +451,7 @@ def handle_start(message):
             clean_screen(u, "❌ <b>This download link is expired or does not exist.</b>")
         return
 
-    # Episode Selection Token with Navigation
+    # Episode Selection Menu with Smart Navigation
     if start_param.startswith("ep_"):
         ep_id = start_param.replace("ep_", "")
         try:
@@ -429,15 +461,13 @@ def handle_start(message):
             ep_doc, series = None, None
 
         if ep_doc and series:
-            bot_un = get_setting("bot_username")
+            bot_un = get_active_bot_username()
             files = ep_doc.get("files", {})
             current_num = int(ep_doc.get("ep_num", "1"))
 
-            # Smart Navigation check
             prev_ep = col_episodes.find_one({"series_id": series["_id"], "ep_num": str(current_num - 1).zfill(2)})
             next_ep = col_episodes.find_one({"series_id": series["_id"], "ep_num": str(current_num + 1).zfill(2)})
 
-            # EXACT 2-ROW BUTTON LAYOUT
             kb = types.InlineKeyboardMarkup()
             row1 = [
                 StyledInlineKeyboardButton(text="480p", url=f"https://t.me/{bot_un}?start={files.get('480p', start_param)}", style="primary"),
@@ -450,7 +480,6 @@ def handle_start(message):
             kb.row(*row1)
             kb.row(*row2)
 
-            # Smart Navigation Buttons
             nav_row = []
             if prev_ep:
                 nav_row.append(StyledInlineKeyboardButton(text=f"⏮️ Ep {current_num - 1}", url=f"https://t.me/{bot_un}?start=ep_{prev_ep['_id']}", style="primary"))
@@ -514,7 +543,7 @@ def handle_help_cb(call):
     help_text = (
         "📖 <b>How to Download:</b>\n\n"
         "1. Channel par jaakar episode post ke neeche Quality button choose karein (480p / 720p / 1080p / HDRip).\n"
-        "2. Bot turant video file bhejega.\n"
+        "2. Bot turant direct download file deliver karega.\n"
         "3. <b>File aate hi apne 'Saved Messages' me forward kar lein</b> (Free users ke liye file 30 min baad delete hogi)."
     )
     kb = types.InlineKeyboardMarkup()
@@ -541,7 +570,7 @@ def handle_retry(call):
     else:
         bot.answer_callback_query(call.id, "❌ You have not joined all required channels yet!", show_alert=True)
 
-# ================= ADMIN MASTER DASHBOARD =================
+# ================= ADMIN DASHBOARD =================
 @bot.message_handler(commands=["admin"])
 def handle_admin_cmd(message):
     remove_user_msg(message)
@@ -580,18 +609,24 @@ def show_settings_menu(call):
     bot.answer_callback_query(call.id)
     brand = get_setting("brand_name")
     main_ch = get_setting("main_channel_id")
-    bot_un = get_setting("bot_username")
+    dl_ch = get_setting("download_channel_link")
+    bot_un = get_active_bot_username()
     prot = get_setting("protect_content") or "False"
+    b_mode = get_setting("button_mode") or "bot"
     
     text = (
         f"⚙️ <b>Bot Configuration:</b>\n\n"
         f"🏷️ <b>Brand Tag:</b> <code>{brand}</code>\n"
         f"📢 <b>Main Channel:</b> {get_channel_title(main_ch)}\n"
+        f"🔗 <b>Download Channel Link:</b> <code>{dl_ch or 'Not Configured'}</code>\n"
+        f"🔘 <b>Download Button Target:</b> <code>{'Direct Channel Link' if b_mode == 'channel' else 'Bot DM Links'}</code>\n"
         f"🤖 <b>Bot Username:</b> <code>@{bot_un}</code>\n"
-        f"🛡️ <b>Anti-Forward (Protect Content):</b> <code>{prot}</code>"
+        f"🛡️ <b>Anti-Forward:</b> <code>{prot}</code>"
     )
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
+        StyledInlineKeyboardButton(text=f"🔘 Toggle Button Target ({'CHANNEL' if b_mode == 'channel' else 'BOT'})", callback_data="toggle_bmode", style="primary"),
+        StyledInlineKeyboardButton(text="🔗 Set Download Channel Link", callback_data="edit_dl_ch", style="primary"),
         StyledInlineKeyboardButton(text=f"🛡️ Toggle Protect Content ({'ON' if prot == 'True' else 'OFF'})", callback_data="toggle_protect", style="primary"),
         StyledInlineKeyboardButton(text="✏️ Edit Brand Tag", callback_data="edit_brand_name", style="primary"),
         StyledInlineKeyboardButton(text="✏️ Edit Main Channel ID / Link", callback_data="edit_main_ch", style="primary"),
@@ -599,6 +634,39 @@ def show_settings_menu(call):
         StyledInlineKeyboardButton(text="🔙 Back to Dashboard", callback_data="admin_hub", style="danger")
     )
     clean_screen(call.message.chat.id, text, reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data == "toggle_bmode")
+def toggle_button_mode(call):
+    bot.answer_callback_query(call.id)
+    cur = get_setting("button_mode") or "bot"
+    new_val = "channel" if cur == "bot" else "bot"
+    update_setting("button_mode", new_val)
+    show_settings_menu(call)
+
+@bot.callback_query_handler(func=lambda c: c.data == "edit_dl_ch")
+def start_edit_dl_ch(call):
+    bot.answer_callback_query(call.id)
+    u = call.message.chat.id
+    msg = clean_screen(
+        u,
+        "🔗 <b>Send Channel Link for Download Buttons:</b>\n\n"
+        "• <b>Private Channel:</b> Send post link (<code>https://t.me/c/...</code>) or Invite Link (<code>https://t.me/+...</code>)\n"
+        "• <b>Public Channel:</b> Send link (<code>https://t.me/channel</code>)"
+    )
+    bot.register_next_step_handler(msg, step_save_dl_ch)
+
+def step_save_dl_ch(message):
+    remove_user_msg(message)
+    u = message.chat.id
+    success, cid, title, safe_link, err = resolve_channel_input(message.text)
+    if not success:
+        msg = clean_screen(u, f"{err}\n\n<b>Please send again:</b>")
+        bot.register_next_step_handler(msg, step_save_dl_ch)
+        return
+
+    update_setting("download_channel_link", safe_link)
+    clean_screen(u, f"✅ <b>Download Channel Link Configured:</b> <code>{safe_link}</code>")
+    show_admin_panel(u)
 
 @bot.callback_query_handler(func=lambda c: c.data == "toggle_protect")
 def toggle_protect_cb(call):
@@ -630,7 +698,7 @@ def start_edit_main_ch(call):
 def step_save_main_ch(message):
     remove_user_msg(message)
     u = message.chat.id
-    success, cid, title, err = resolve_channel_input(message.text)
+    success, cid, title, safe_link, err = resolve_channel_input(message.text)
     if not success:
         msg = clean_screen(u, f"{err}\n\n<b>Please send a valid link or ID again:</b>")
         bot.register_next_step_handler(msg, step_save_main_ch)
@@ -652,7 +720,7 @@ def step_save_bot_user(message):
     update_setting("bot_username", message.text.strip().replace("@", ""))
     show_admin_panel(message.chat.id)
 
-# ================= MULTI-ADMIN TEAM MANAGEMENT =================
+# ================= MULTI-ADMIN TEAM =================
 @bot.callback_query_handler(func=lambda c: c.data == "admin_team_hub")
 def show_admin_team_menu(call):
     bot.answer_callback_query(call.id)
@@ -904,7 +972,7 @@ def step_series_poster(message):
     clean_screen(u, f"✅ <b>Series Added Successfully!</b>\n\n📌 <b>Title:</b> {temp.get('title')}\n⚡ <b>Season:</b> {temp.get('season')}")
     show_admin_panel(u)
 
-# ================= SINGLE EPISODE UPLOAD FLOW =================
+# ================= EPISODE UPLOAD FLOW =================
 @bot.callback_query_handler(func=lambda c: c.data == "admin_upload_ep")
 def handle_upload_ep_entry(call):
     bot.answer_callback_query(call.id)
@@ -1052,8 +1120,8 @@ def step_batch_start_ep(message):
         u,
         f"⚡ <b>Batch Mode ACTIVE!</b>\n\n"
         f"Starting from <b>Episode {start_ep}</b> (720p/Direct).\n"
-        f"• Simply forward or send video files one by one.\n"
-        f"• Episode numbers will auto-increment automatically!\n"
+        f"• Forward or send video files one by one.\n"
+        f"• Episode numbers auto-increment automatically!\n"
         f"• Tap <b>'Finish'</b> when done.",
         reply_markup=kb
     )
@@ -1109,7 +1177,7 @@ def finish_batch_cb(call):
     clean_screen(u, f"🎉 <b>Batch Complete!</b> Successfully uploaded {total} episodes.")
     show_admin_panel(u)
 
-# ================= BROADCAST TO MAIN CHANNEL =================
+# ================= BROADCAST WITH SMART BUTTONS =================
 @bot.callback_query_handler(func=lambda c: c.data == "publish_episode")
 def publish_episode_broadcast(call):
     bot.answer_callback_query(call.id)
@@ -1130,12 +1198,13 @@ def publish_episode_broadcast(call):
     })
 
     main_ch = get_setting("main_channel_id")
-    bot_un = get_setting("bot_username")
+    bot_un = get_active_bot_username()
     brand = get_setting("brand_name")
+    b_mode = get_setting("button_mode") or "bot"
+    dl_ch_link = get_setting("download_channel_link")
     files = ep_data["files"]
     ep_id = str(ep_res.inserted_id)
 
-    # ✦ STYLIZED CAPTION ✦
     styled_title = to_bold_serif(series['title'])
     caption = (
         f"✦ <b>{styled_title}</b>\n"
@@ -1149,31 +1218,22 @@ def publish_episode_broadcast(call):
         f"✦ <b>Powered By :</b> {brand}"
     )
 
-    # ✦ EXACT 2-ROW BUTTON LAYOUT ✦
+    # Resolve button links based on active mode
+    def make_btn_url(quality_key):
+        if b_mode == "channel" and dl_ch_link:
+            return dl_ch_link
+        if quality_key in files:
+            return f"https://t.me/{bot_un}?start={files[quality_key]}"
+        return f"https://t.me/{bot_un}?start=ep_{ep_id}"
+
     kb = types.InlineKeyboardMarkup()
     row1 = [
-        StyledInlineKeyboardButton(
-            text="480p",
-            url=f"https://t.me/{bot_un}?start={files['480p']}" if "480p" in files else f"https://t.me/{bot_un}?start=ep_{ep_id}",
-            style="primary"
-        ),
-        StyledInlineKeyboardButton(
-            text="720p",
-            url=f"https://t.me/{bot_un}?start={files['720p']}" if "720p" in files else f"https://t.me/{bot_un}?start=ep_{ep_id}",
-            style="primary"
-        ),
-        StyledInlineKeyboardButton(
-            text="1080p",
-            url=f"https://t.me/{bot_un}?start={files['1080p']}" if "1080p" in files else f"https://t.me/{bot_un}?start=ep_{ep_id}",
-            style="primary"
-        )
+        StyledInlineKeyboardButton(text="480p", url=make_btn_url("480p"), style="primary"),
+        StyledInlineKeyboardButton(text="720p", url=make_btn_url("720p"), style="primary"),
+        StyledInlineKeyboardButton(text="1080p", url=make_btn_url("1080p"), style="primary")
     ]
     row2 = [
-        StyledInlineKeyboardButton(
-            text="HDRip",
-            url=f"https://t.me/{bot_un}?start={files['HDRip']}" if "HDRip" in files else f"https://t.me/{bot_un}?start=ep_{ep_id}",
-            style="primary"
-        )
+        StyledInlineKeyboardButton(text="HDRip", url=make_btn_url("HDRip"), style="primary")
     ]
     kb.row(*row1)
     kb.row(*row2)
@@ -1187,7 +1247,7 @@ def publish_episode_broadcast(call):
                 reply_markup=kb,
                 parse_mode="HTML"
             )
-            clean_screen(u, "✅ <b>Episode Published & Broadcasted to Channel!</b>")
+            clean_screen(u, "✅ <b>Episode Published & Broadcasted Successfully!</b>")
         except Exception as e:
             notify_admin_error("Broadcast Failed", e)
             clean_screen(u, f"⚠️ Broadcast Error: <code>{e}</code>")
@@ -1197,7 +1257,7 @@ def publish_episode_broadcast(call):
     clear_session(u)
     show_admin_panel(u)
 
-# ================= RICH MEDIA BROADCAST TO BOT USERS =================
+# ================= RICH MEDIA BROADCAST TO USERS =================
 @bot.callback_query_handler(func=lambda c: c.data == "admin_broadcast")
 def start_rich_broadcast_prompt(call):
     bot.answer_callback_query(call.id)
@@ -1219,7 +1279,6 @@ def perform_rich_broadcast(message):
     caption_text = message.caption or message.text or ""
     btn_markup = None
     
-    # Custom Button Parser
     if "|" in caption_text:
         lines = caption_text.split("\n")
         last_line = lines[-1]
@@ -1283,21 +1342,15 @@ def start_add_fsub(call):
 def step_save_fsub(message):
     remove_user_msg(message)
     u = message.chat.id
-    success, cid, title, err = resolve_channel_input(message.text)
+    success, cid, title, safe_link, err = resolve_channel_input(message.text)
     if not success:
         msg = clean_screen(u, f"{err}\n\n<b>Send again:</b>")
         bot.register_next_step_handler(msg, step_save_fsub)
         return
 
-    try:
-        chat = bot.get_chat(cid)
-        inv = chat.invite_link or (f"https://t.me/{chat.username}" if chat.username else bot.export_chat_invite_link(cid))
-    except Exception:
-        inv = "https://t.me"
-
     col_fsub.update_one(
         {"channel_id": cid},
-        {"$set": {"channel_id": cid, "title": title, "invite_link": inv}},
+        {"$set": {"channel_id": cid, "title": title, "invite_link": safe_link}},
         upsert=True
     )
     clean_screen(u, f"✅ Added ForceSub: <b>{title}</b>")
@@ -1397,5 +1450,5 @@ def show_live_stats(call):
 
 # ================= BOT POLLING START =================
 if __name__ == "__main__":
-    logger.info("🤖 Starting Anime Delivery Master Bot with Full Advanced Suite...")
+    logger.info(f"🤖 Starting Anime Delivery Master Bot (@{DETECTED_BOT_USERNAME})...")
     bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=60)
