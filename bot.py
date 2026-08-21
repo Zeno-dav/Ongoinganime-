@@ -353,7 +353,7 @@ def clean_screen(chat_id, text, reply_markup=None, photo=None):
     except Exception:
         pass
 
-    session = get_session(user_id=chat_id)
+    session = get_session(chat_id)
     for mid in session.get("msg_history", []):
         try:
             master_bot.delete_message(chat_id, mid)
@@ -490,15 +490,15 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             kb = types.InlineKeyboardMarkup()
             row1 = []
             if files.get('480p'):
-                row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('480p')}", style="primary"))
+                row1.append(StyledInlineKeyboardButton(text="📥 480p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('480p')}", style="primary"))
             if files.get('720p'):
-                row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('720p')}", style="primary"))
+                row1.append(StyledInlineKeyboardButton(text="📥 720p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('720p')}", style="primary"))
+            if files.get('1080p'):
+                row1.append(StyledInlineKeyboardButton(text="📥 1080p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('1080p')}", style="primary"))
             
             row2 = []
-            if files.get('1080p'):
-                row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('1080p')}", style="primary"))
             if files.get('HDRip'):
-                row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('HDRip')}", style="primary"))
+                row2.append(StyledInlineKeyboardButton(text="📥 HDRip", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('HDRip')}", style="primary"))
             
             if row1:
                 kb.row(*row1)
@@ -508,15 +508,14 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             safe_title = html.escape(str(series['title']))
             styled_title = to_bold_serif(safe_title)
             caption = (
-                f"✦ <b>{styled_title}</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━━\n"
-                f"▶ <b>Status :</b> {series.get('status', 'ONGOING')}\n"
-                f"▶ <b>Seasons :</b> {html.escape(str(series.get('season', '01')))}\n"
-                f"▶ <b>Episodes :</b> {html.escape(str(ep_doc.get('ep_num', '01')))}\n"
-                f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-                f"▶ <b>Quality :</b> 480p , 720p , 1080p , HDRip\n"
-                f"━━━━━━━━━━━━━━━━━━━━━\n"
-                f"✦ <b>Powered By :</b> {html.escape(str(get_setting('brand_name')))}"
+                f"╭──────────────────────╮\n"
+                f"  <b>⚡ {styled_title} ⚡</b>\n"
+                f"╰──────────────────────╯\n\n"
+                f"💎 <b>sᴛᴀᴛᴜs :</b> {series.get('status', 'ONGOING')}\n"
+                f"🎬 <b>sᴇᴀsᴏɴ :</b> {html.escape(str(series.get('season', '01')))} | <b>ᴇᴘ :</b> {html.escape(str(ep_doc.get('ep_num', '01')))}\n"
+                f"🎧 <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✦ <i>Tap buttons below for instant high-speed download!</i>"
             )
             bot_instance.send_photo(u, photo=series.get("poster"), caption=caption, reply_markup=kb)
             return
@@ -704,12 +703,12 @@ def view_series_details(call):
     caption = (
         f"✦ <b>{styled_title}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶ <b>Status :</b> {series.get('status', 'ONGOING')}\n"
-        f"▶ <b>Season :</b> {html.escape(str(series.get('season', '01')))}\n"
-        f"▶ <b>Total Episodes :</b> {ep_count}\n"
-        f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-        f"▶ <b>Series Channel Title :</b> <code>{html.escape(str(t_ch))}</code>\n"
-        f"▶ <b>Series Download Link :</b> <code>{html.escape(str(t_link))}</code>\n"
+        f"▶ <b>sᴛᴀᴛᴜs :</b> {series.get('status', 'ONGOING')}\n"
+        f"▶ <b>sᴇᴀsᴏɴ :</b> {html.escape(str(series.get('season', '01')))}\n"
+        f"▶ <b>ᴛᴏᴛᴀʟ ᴇᴘɪsᴏᴅᴇs :</b> {ep_count}\n"
+        f"▶ <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
+        f"▶ <b>ᴄʜᴀɴɴᴇʟ ᴛɪᴛʟᴇ :</b> <code>{html.escape(str(t_ch))}</code>\n"
+        f"▶ <b>ᴅᴏᴡɴʟᴏᴀᴅ ʟɪɴᴋ :</b> <code>{html.escape(str(t_link))}</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━━"
     )
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -832,73 +831,74 @@ def handle_rebroadcast_single_episode(call):
 
     main_channel_id = get_setting("main_channel_id")
     raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
+    series_dl_link = series.get("target_channel_link")
 
     files = ep.get("files", {})
-    kb = types.InlineKeyboardMarkup()
+
+    # 1. Main Channel Keyboard (Only "⛩️ Download Now ⛩️" button)
+    main_kb = types.InlineKeyboardMarkup()
+    if series_dl_link:
+        main_kb.add(StyledInlineKeyboardButton(text="⛩️ ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏᴡ ⛩️", url=series_dl_link, style="success"))
+
+    # 2. Particular Series Channel Keyboard (480p | 720p | 1080p and HDRip below)
+    part_kb = types.InlineKeyboardMarkup()
     w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
+    
     row1 = []
     if files.get('480p'):
-        row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
+        row1.append(StyledInlineKeyboardButton(text="📥 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
     if files.get('720p'):
-        row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+        row1.append(StyledInlineKeyboardButton(text="📥 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+    if files.get('1080p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
     
     row2 = []
-    if files.get('1080p'):
-        row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
     if files.get('HDRip'):
-        row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
+        row2.append(StyledInlineKeyboardButton(text="📥 HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
     
     if row1:
-        kb.row(*row1)
+        part_kb.row(*row1)
     if row2:
-        kb.row(*row2)
-
-    series_dl_link = series.get("target_channel_link")
-    if series_dl_link:
-        kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
+        part_kb.row(*row2)
 
     safe_title = html.escape(str(series_title))
     styled_title = to_bold_serif(safe_title)
     caption = (
-        f"✦ <b>{styled_title}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"╭──────────────────────╮\n"
+        f"  <b>⚡ {styled_title} ⚡</b>\n"
+        f"╰──────────────────────╯\n\n"
         f"🔥 <b>ɴᴇᴡ ᴇᴘɪsᴏᴅᴇ ʀᴇʟᴇᴀsᴇᴅ!</b>\n"
-        f"🎯 <b>sᴇᴀsᴏɴ :</b> {html.escape(str(season))} | <b>ᴇᴘɪsᴏᴅᴇ :</b> {html.escape(str(ep_num))}\n"
-        f"🔊 <b>ᴀᴜᴅɪᴏ:</b> {html.escape(str(audio))}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎯 <b>sᴇᴀsᴏɴ :</b> {html.escape(str(season))} | <b>ᴇᴘ :</b> {html.escape(str(ep_num))}\n"
+        f"🎧 <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(audio))}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"✦ <i>High speed direct download links are live below!</i>"
     )
 
-    targets = set()
+    # Resolve Main Channel
     if main_channel_id:
-        success, resolved_main, _, _, err = resolve_channel_input(main_channel_id)
-        if success and resolved_main:
-            targets.add(str(resolved_main))
-        else:
-            targets.add(str(main_channel_id))
-            notify_admin_error("Main Channel Resolve Error during Single Rebroadcast", err)
-
-    if raw_series_ch:
-        success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
-        if success and resolved_id:
-            targets.add(str(resolved_id))
-        else:
-            targets.add(str(raw_series_ch))
-            notify_admin_error("Particular Channel Resolve Error during Single Rebroadcast", err)
-
-    for chat_id in targets:
         try:
-            if str(chat_id).startswith("http") or "+" in str(chat_id):
-                continue
-            chat_target = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+            success, resolved_main, _, _, err = resolve_channel_input(main_channel_id)
+            chat_target = int(resolved_main) if success and resolved_main else (int(main_channel_id) if str(main_channel_id).lstrip("-").isdigit() else main_channel_id)
             if poster:
-                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=kb, parse_mode="HTML")
+                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=main_kb, parse_mode="HTML")
             else:
-                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
+                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=main_kb, parse_mode="HTML")
         except Exception as e:
-            notify_admin_error(f"Failed single episode broadcast to chat {chat_id}", e)
+            notify_admin_error("Main Channel Broadcast Error (Single Ep)", e)
 
-    clean_screen(u, f"✅ <b>Episode {ep_num} re-broadcasted successfully to all channels!</b>")
+    # Resolve Particular Channel
+    if raw_series_ch:
+        try:
+            success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
+            chat_target = int(resolved_id) if success and resolved_id else (int(raw_series_ch) if str(raw_series_ch).lstrip("-").isdigit() else raw_series_ch)
+            if poster:
+                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=part_kb, parse_mode="HTML")
+            else:
+                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=part_kb, parse_mode="HTML")
+        except Exception as e:
+            notify_admin_error("Particular Channel Broadcast Error (Single Ep)", e)
+
+    clean_screen(u, f"✅ <b>Episode {ep_num} re-broadcasted successfully!</b>")
     show_admin_panel(u)
 
 @master_bot.callback_query_handler(func=lambda c: c.data.startswith("del_ep_"))
@@ -935,86 +935,78 @@ def handle_series_completion_rebroadcast(call):
 
     main_ch = get_setting("main_channel_id")
     brand = get_setting("brand_name")
-    ep_id = str(ep_doc["_id"])
     series_dl_link = series.get("target_channel_link")
-    if not series_dl_link:
-        target_bot = clean_bot_username(get_random_worker())
-        series_dl_link = f"https://t.me/{target_bot}?start=ep_{ep_id}"
+    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
 
     safe_title = html.escape(str(series['title']))
     styled_title = to_bold_serif(safe_title)
 
     files = ep_doc.get("files", {})
-    kb = types.InlineKeyboardMarkup()
+
+    # Main Channel KB
+    main_kb = types.InlineKeyboardMarkup()
+    if series_dl_link:
+        main_kb.add(StyledInlineKeyboardButton(text="⛩️ ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏᴡ ⛩️", url=series_dl_link, style="success"))
+
+    # Particular Channel KB (480p | 720p | 1080p and HDRip below)
+    part_kb = types.InlineKeyboardMarkup()
     w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
+    
     row1 = []
     if files.get('480p'):
-        row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
+        row1.append(StyledInlineKeyboardButton(text="📥 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
     if files.get('720p'):
-        row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+        row1.append(StyledInlineKeyboardButton(text="📥 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+    if files.get('1080p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
     
     row2 = []
-    if files.get('1080p'):
-        row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
     if files.get('HDRip'):
-        row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
+        row2.append(StyledInlineKeyboardButton(text="📥 HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
     
     if row1:
-        kb.row(*row1)
+        part_kb.row(*row1)
     if row2:
-        kb.row(*row2)
-    kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
+        part_kb.row(*row2)
 
     caption = (
-        f"✦ <b>{styled_title}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶ <b>sᴛᴀᴛᴜs :</b> ᴄᴏᴍᴘʟᴇᴛᴇᴅ\n"
-        f"▶ <b>sᴇᴀsᴏɴs :</b> {html.escape(str(series.get('season', '01')))}\n"
-        f"▶ <b>ᴛᴏᴛᴀʟ ᴇᴘɪsᴏᴅᴇs :</b> {html.escape(str(ep_doc.get('ep_num', '01')))}\n"
-        f"▶ <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"╭──────────────────────╮\n"
+        f"  <b>⚡ {styled_title} ⚡</b>\n"
+        f"╰──────────────────────╯\n\n"
+        f"💎 <b>sᴛᴀᴛᴜs :</b> ᴄᴏᴍᴘʟᴇᴛᴇᴅ\n"
+        f"🎬 <b>sᴇᴀsᴏɴs :</b> {html.escape(str(series.get('season', '01')))}\n"
+        f"🎧 <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"✦ <b>ᴘᴏᴡᴇʀᴇᴅ ʙʏ :</b> {html.escape(str(brand))}"
     )
 
-    targets = set()
-    if main_ch:
-        success, resolved_main, _, _, err = resolve_channel_input(main_ch)
-        if success and resolved_main:
-            targets.add(str(resolved_main))
-        else:
-            targets.add(str(main_ch))
-            notify_admin_error("Main Channel Resolve Error during Series Completion Rebroadcast", err)
-
-    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
-    if raw_series_ch:
-        success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
-        if success and resolved_id:
-            targets.add(str(resolved_id))
-        else:
-            targets.add(str(raw_series_ch))
-            notify_admin_error("Particular Channel Resolve Error during Series Completion Rebroadcast", err)
-
-    new_sent_records = {}
     poster = series.get("poster")
-    for chat_id in targets:
+    
+    # Broadcast to Main Channel
+    if main_ch:
         try:
-            if str(chat_id).startswith("http") or "+" in str(chat_id):
-                continue
-            chat_target = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+            success, resolved_main, _, _, err = resolve_channel_input(main_ch)
+            chat_target = int(resolved_main) if success and resolved_main else (int(main_ch) if str(main_ch).lstrip("-").isdigit() else main_ch)
             if poster:
-                msg = master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=kb, parse_mode="HTML")
+                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=main_kb, parse_mode="HTML")
             else:
-                msg = master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
-            new_sent_records[str(chat_id)] = msg.message_id
+                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=main_kb, parse_mode="HTML")
         except Exception as e:
-            notify_admin_error(f"Failed completion broadcast to chat {chat_id}", e)
+            notify_admin_error("Main Channel Broadcast Error (Series Complete)", e)
 
-    col_series.update_one(
-        {"_id": series["_id"]},
-        {"$set": {"broadcast_message_ids": new_sent_records, "status": "COMPLETED"}}
-    )
+    # Broadcast to Particular Channel
+    if raw_series_ch:
+        try:
+            success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
+            chat_target = int(resolved_id) if success and resolved_id else (int(raw_series_ch) if str(raw_series_ch).lstrip("-").isdigit() else raw_series_ch)
+            if poster:
+                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=part_kb, parse_mode="HTML")
+            else:
+                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=part_kb, parse_mode="HTML")
+        except Exception as e:
+            notify_admin_error("Particular Channel Broadcast Error (Series Complete)", e)
 
-    clean_screen(u, "✅ <b>Series marked as COMPLETED and broadcasted successfully to Main Channel & Particular Channel!</b>")
+    clean_screen(u, "✅ <b>Series marked as COMPLETED and broadcasted successfully!</b>")
     show_admin_panel(u)
 
 # --- Full Edit Series Menu ---
@@ -1405,90 +1397,76 @@ def publish_episode_broadcast(call):
     ep_id = str(ep_res.inserted_id)
 
     files = ep_data.get("files", {})
-    kb = types.InlineKeyboardMarkup()
-    w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
-    row1 = []
-    if files.get('480p'):
-        row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
-    if files.get('720p'):
-        row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
     
-    row2 = []
-    if files.get('1080p'):
-        row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
-    if files.get('HDRip'):
-        row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
-    
-    if row1:
-        kb.row(*row1)
-    if row2:
-        kb.row(*row2)
-
+    # 1. Main Channel Keyboard (Only "⛩️ Download Now ⛩️" button)
+    main_kb = types.InlineKeyboardMarkup()
     series_dl_link = series.get("target_channel_link")
     if series_dl_link:
-        kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
+        main_kb.add(StyledInlineKeyboardButton(text="⛩️ ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏᴡ ⛩️", url=series_dl_link, style="success"))
+
+    # 2. Particular Series Channel Keyboard (480p | 720p | 1080p and HDRip below)
+    part_kb = types.InlineKeyboardMarkup()
+    w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
+    
+    row1 = []
+    if files.get('480p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
+    if files.get('720p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+    if files.get('1080p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
+    
+    row2 = []
+    if files.get('HDRip'):
+        row2.append(StyledInlineKeyboardButton(text="📥 HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
+    
+    if row1:
+        part_kb.row(*row1)
+    if row2:
+        part_kb.row(*row2)
 
     safe_title = html.escape(str(series['title']))
     styled_title = to_bold_serif(safe_title)
 
     caption = (
-        f"✦ <b>{styled_title}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"╭──────────────────────╮\n"
+        f"  <b>⚡ {styled_title} ⚡</b>\n"
+        f"╰──────────────────────╯\n\n"
         f"🔥 <b>ɴᴇᴡ ᴇᴘɪsᴏᴅᴇ ʀᴇʟᴇᴀsᴇᴅ!</b>\n"
-        f"🎯 <b>sᴇᴀsᴏɴ :</b> {html.escape(str(series.get('season', '01')))} | <b>ᴇᴘɪsᴏᴅᴇ :</b> {html.escape(str(ep_data.get('ep_num', '01')))}\n"
-        f"🔊 <b>ᴀᴜᴅɪᴏ:</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎯 <b>sᴇᴀsᴏɴ :</b> {html.escape(str(series.get('season', '01')))} | <b>ᴇᴘ :</b> {html.escape(str(ep_data.get('ep_num', '01')))}\n"
+        f"🎧 <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"✦ <i>High speed direct download links are live below!</i>"
     )
 
     poster = series.get("poster")
-    
-    targets = set()
-    if main_ch:
-        success, resolved_main, _, _, err = resolve_channel_input(main_ch)
-        if success and resolved_main:
-            targets.add(str(resolved_main))
-        else:
-            targets.add(str(main_ch))
-            notify_admin_error("Main Channel Resolve Error during Publish", err)
-
     raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
-    if raw_series_ch:
-        success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
-        if success and resolved_id:
-            targets.add(str(resolved_id))
-        else:
-            targets.add(str(raw_series_ch))
-            notify_admin_error("Particular Channel Resolve Error during Publish", err)
 
-    sent_msg_ids = series.get("broadcast_message_ids", {})
-    success_count = 0
-
-    for chat_id in targets:
+    # Send to Main Channel
+    if main_ch:
         try:
-            if str(chat_id).startswith("http") or "+" in str(chat_id):
-                continue
-            chat_target = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+            success, resolved_main, _, _, err = resolve_channel_input(main_ch)
+            chat_target = int(resolved_main) if success and resolved_main else (int(main_ch) if str(main_ch).lstrip("-").isdigit() else main_ch)
             if poster:
-                msg = master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=kb, parse_mode="HTML")
+                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=main_kb, parse_mode="HTML")
             else:
-                msg = master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
-            sent_msg_ids[str(chat_id)] = msg.message_id
-            success_count += 1
+                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=main_kb, parse_mode="HTML")
         except Exception as e:
-            notify_admin_error(f"Failed broadcast to chat {chat_id}", e)
+            notify_admin_error("Main Channel Publish Error", e)
 
-    col_series.update_one(
-        {"_id": series["_id"]},
-        {"$set": {"broadcast_message_ids": sent_msg_ids}}
-    )
+    # Send to Particular Series Channel
+    if raw_series_ch:
+        try:
+            success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
+            chat_target = int(resolved_id) if success and resolved_id else (int(raw_series_ch) if str(raw_series_ch).lstrip("-").isdigit() else raw_series_ch)
+            if poster:
+                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=part_kb, parse_mode="HTML")
+            else:
+                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=part_kb, parse_mode="HTML")
+        except Exception as e:
+            notify_admin_error("Particular Channel Publish Error", e)
 
-    if success_count > 0:
-        clean_screen(u, f"✅ <b>Published successfully to Main Channel & Particular Series Channel!</b>\n\nLink: <code>{series_dl_link}</code>")
-    else:
-        clean_screen(u, f"⚠️ Broadcast warning: Check channel IDs and bot admin permissions in your channels.")
-
-    clear_session(u)
+    clean_screen(u, f"✅ <b>Published successfully to Main Channel & Particular Channel!</b>")
     show_admin_panel(u)
 
 # ================= BATCH EPISODE UPLOADER =================
