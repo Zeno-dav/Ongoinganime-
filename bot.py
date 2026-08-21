@@ -26,7 +26,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7"
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
