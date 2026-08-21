@@ -26,7 +26,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7"
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7!"
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
@@ -353,7 +353,7 @@ def clean_screen(chat_id, text, reply_markup=None, photo=None):
     except Exception:
         pass
 
-    session = get_session(chat_id)
+    session = get_session(user_id=chat_id)
     for mid in session.get("msg_history", []):
         try:
             master_bot.delete_message(chat_id, mid)
@@ -380,7 +380,7 @@ def remove_user_msg(message):
     except Exception:
         pass
 
-# ================= FORWARD AUTO DETECT =================
+# ================= CHAT ID EXTRACTOR & FORWARD DETECT =================
 @master_bot.message_handler(func=lambda msg: is_admin(msg.chat.id) and msg.forward_from_chat is not None)
 def handle_forwarded_channel_id(message):
     remove_user_msg(message)
@@ -390,11 +390,12 @@ def handle_forwarded_channel_id(message):
     
     clean_screen(
         message.chat.id,
-        f"📢 <b>Forwarded Channel Detected:</b>\n\n"
+        f"💡 <b>Chat ID Info Extracted Successfully!</b>\n\n"
         f"📌 <b>Title:</b> {ch_title}\n"
-        f"🆔 <b>Numeric ID:</b> <code>{ch_id}</code>\n"
-        f"🔗 <b>Safe Invite Link:</b> <code>{safe_link}</code>\n\n"
-        f"<i>Copied automatically! You can paste this ID/Link anytime.</i>"
+        f"🤖 <b>Type:</b> Requested Group/Channel\n"
+        f"🆔 <b>Chat ID:</b> <code>{ch_id}</code>\n"
+        f"🔗 <b>Safe Link:</b> <code>{safe_link}</code>\n\n"
+        f"<i>Copied automatically! You can paste this ID anytime.</i>"
     )
 
 # ================= MULTI-BOT CLUSTER ENGINE =================
@@ -487,24 +488,22 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             next_ep = col_episodes.find_one({"series_id": series["_id"], "ep_num": str(current_num + 1).zfill(2)})
 
             kb = types.InlineKeyboardMarkup()
-            row1 = [
-                StyledInlineKeyboardButton(text="480p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('480p', start_param)}", style="primary"),
-                StyledInlineKeyboardButton(text="720p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('720p', start_param)}", style="primary"),
-                StyledInlineKeyboardButton(text="1080p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('1080p', start_param)}", style="primary")
-            ]
-            row2 = [
-                StyledInlineKeyboardButton(text="HDRip", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('HDRip', start_param)}", style="primary")
-            ]
-            kb.row(*row1)
-            kb.row(*row2)
-
-            nav_row = []
-            if prev_ep:
-                nav_row.append(StyledInlineKeyboardButton(text=f"⏮️ Ep {current_num - 1}", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start=ep_{prev_ep['_id']}", style="primary"))
-            if next_ep:
-                nav_row.append(StyledInlineKeyboardButton(text=f"Ep {current_num + 1} ⏭️", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start=ep_{next_ep['_id']}", style="primary"))
-            if nav_row:
-                kb.row(*nav_row)
+            row1 = []
+            if files.get('480p'):
+                row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('480p')}", style="primary"))
+            if files.get('720p'):
+                row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('720p')}", style="primary"))
+            
+            row2 = []
+            if files.get('1080p'):
+                row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('1080p')}", style="primary"))
+            if files.get('HDRip'):
+                row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{clean_bot_username(get_random_worker())}?start={files.get('HDRip')}", style="primary"))
+            
+            if row1:
+                kb.row(*row1)
+            if row2:
+                kb.row(*row2)
 
             safe_title = html.escape(str(series['title']))
             styled_title = to_bold_serif(safe_title)
@@ -760,12 +759,15 @@ def handle_edit_specific_episode(call):
     text = (
         f"🎬 <b>Episode Management:</b> {series['title']} - Ep {ep.get('ep_num')}\n\n"
         f"📁 <b>Available Qualities:</b> {list(ep.get('files', {}).keys())}\n\n"
-        f"Choose an action:"
+        f"Choose quality to replace/update:"
     )
-    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
-        StyledInlineKeyboardButton(text="📤 Replace / Update File (720p)", callback_data=f"rep_file_{epid}_720p", style="primary"),
-        StyledInlineKeyboardButton(text="🚀 Re-broadcast this Episode", callback_data=f"rebroadcast_ep_{epid}", style="success"),
+        StyledInlineKeyboardButton(text="📤 Replace 480p", callback_data=f"rep_file_{epid}_480p", style="primary"),
+        StyledInlineKeyboardButton(text="📤 Replace 720p", callback_data=f"rep_file_{epid}_720p", style="primary"),
+        StyledInlineKeyboardButton(text="📤 Replace 1080p", callback_data=f"rep_file_{epid}_1080p", style="primary"),
+        StyledInlineKeyboardButton(text="📤 Replace HDRip", callback_data=f"rep_file_{epid}_HDRip", style="primary"),
+        StyledInlineKeyboardButton(text="🚀 Re-broadcast", callback_data=f"rebroadcast_ep_{epid}", style="success"),
         StyledInlineKeyboardButton(text="🗑️ Delete Episode", callback_data=f"del_ep_{epid}", style="danger"),
         StyledInlineKeyboardButton(text=f"🔙 Back", callback_data=f"manage_eps_{series['_id']}", style="danger")
     )
@@ -831,16 +833,40 @@ def handle_rebroadcast_single_episode(call):
     main_channel_id = get_setting("main_channel_id")
     raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
 
+    files = ep.get("files", {})
     kb = types.InlineKeyboardMarkup()
-    worker_un = clean_bot_username(get_random_worker())
-    kb.add(StyledInlineKeyboardButton(text="🚀 Download Now ↗", url=f"https://t.me/{worker_un}?start=ep_{ep_id}", style="success"))
+    w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
+    row1 = []
+    if files.get('480p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
+    if files.get('720p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+    
+    row2 = []
+    if files.get('1080p'):
+        row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
+    if files.get('HDRip'):
+        row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
+    
+    if row1:
+        kb.row(*row1)
+    if row2:
+        kb.row(*row2)
 
+    series_dl_link = series.get("target_channel_link")
+    if series_dl_link:
+        kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
+
+    safe_title = html.escape(str(series_title))
+    styled_title = to_bold_serif(safe_title)
     caption = (
-        f"🔥 <b>NEW EPISODE RELEASED!</b>\n\n"
-        f"📺 <b>{html.escape(str(series_title))}</b>\n"
-        f"🎯 <b>Season :</b> {html.escape(str(season))} | <b>Episode :</b> {html.escape(str(ep_num))}\n"
-        f"🔊 <b>Audio:</b> {html.escape(str(audio))}\n\n"
-        f"✦ <i>High speed direct download links are now live below!</i>"
+        f"✦ <b>{styled_title}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔥 <b>ɴᴇᴡ ᴇᴘɪsᴏᴅᴇ ʀᴇʟᴇᴀsᴇᴅ!</b>\n"
+        f"🎯 <b>sᴇᴀsᴏɴ :</b> {html.escape(str(season))} | <b>ᴇᴘɪsᴏᴅᴇ :</b> {html.escape(str(ep_num))}\n"
+        f"🔊 <b>ᴀᴜᴅɪᴏ:</b> {html.escape(str(audio))}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"✦ <i>High speed direct download links are live below!</i>"
     )
 
     targets = set()
@@ -921,28 +947,33 @@ def handle_series_completion_rebroadcast(call):
     files = ep_doc.get("files", {})
     kb = types.InlineKeyboardMarkup()
     w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
-    row1 = [
-        StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p', ep_id)}", style="primary"),
-        StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p', ep_id)}", style="primary")
-    ]
-    row2 = [
-        StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p', ep_id)}", style="primary"),
-        StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip', ep_id)}", style="primary")
-    ]
-    kb.row(*row1)
-    kb.row(*row2)
+    row1 = []
+    if files.get('480p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
+    if files.get('720p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+    
+    row2 = []
+    if files.get('1080p'):
+        row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
+    if files.get('HDRip'):
+        row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
+    
+    if row1:
+        kb.row(*row1)
+    if row2:
+        kb.row(*row2)
     kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
 
     caption = (
         f"✦ <b>{styled_title}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶ <b>Status :</b> COMPLETED\n"
-        f"▶ <b>Seasons :</b> {html.escape(str(series.get('season', '01')))}\n"
-        f"▶ <b>Total Episodes :</b> {html.escape(str(ep_doc.get('ep_num', '01')))}\n"
-        f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-        f"▶ <b>Quality :</b> 480p , 720p , 1080p , HDRip\n"
+        f"▶ <b>sᴛᴀᴛᴜs :</b> ᴄᴏᴍᴘʟᴇᴛᴇᴅ\n"
+        f"▶ <b>sᴇᴀsᴏɴs :</b> {html.escape(str(series.get('season', '01')))}\n"
+        f"▶ <b>ᴛᴏᴛᴀʟ ᴇᴘɪsᴏᴅᴇs :</b> {html.escape(str(ep_doc.get('ep_num', '01')))}\n"
+        f"▶ <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"✦ <b>Powered By :</b> {html.escape(str(brand))}"
+        f"✦ <b>ᴘᴏᴡᴇʀᴇᴅ ʙʏ :</b> {html.escape(str(brand))}"
     )
 
     targets = set()
@@ -1157,8 +1188,8 @@ def step_execute_anilist_fetch(message):
     msg = clean_screen(
         u,
         f"🎬 <b>AniList Fetched:</b> {anime_title}\n\n"
-        f"🔗 <b>Send Specific Channel Link for this Anime (Download Button Link):</b>\n"
-        f"Example: <code>https://t.me/+bfskhFyvL5RhZTI9</code>\n\n"
+        f"🔗 <b>Send Specific Channel Link/ID for this Anime (Download Button Link):</b>\n"
+        f"Example: <code>https://t.me/your_channel</code> or <code>-100...</code>\n\n"
         f"<i>(Send <code>/skip</code> if you want to set it later)</i>"
     )
     master_bot.register_next_step_handler(msg, step_save_series_channel_initial)
@@ -1206,8 +1237,8 @@ def step_series_poster(message):
     update_session(u, {"temp_series.poster": poster_id})
     msg = clean_screen(
         u,
-        "🔗 <b>Send Specific Channel Link for this Anime (Download Button Link):</b>\n\n"
-        "Example: <code>https://t.me/+bfskhFyvL5RhZTI9</code>\n"
+        "🔗 <b>Send Specific Channel Link/ID for this Anime (Download Button Link):</b>\n\n"
+        "Example: <code>https://t.me/your_channel</code> or <code>-100...</code>\n"
         "<i>(Send <code>/skip</code> if you want to set it later)</i>"
     )
     master_bot.register_next_step_handler(msg, step_save_series_channel_initial)
@@ -1373,10 +1404,29 @@ def publish_episode_broadcast(call):
     brand = get_setting("brand_name")
     ep_id = str(ep_res.inserted_id)
 
+    files = ep_data.get("files", {})
+    kb = types.InlineKeyboardMarkup()
+    w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
+    row1 = []
+    if files.get('480p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p')}", style="primary"))
+    if files.get('720p'):
+        row1.append(StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p')}", style="primary"))
+    
+    row2 = []
+    if files.get('1080p'):
+        row2.append(StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p')}", style="primary"))
+    if files.get('HDRip'):
+        row2.append(StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip')}", style="primary"))
+    
+    if row1:
+        kb.row(*row1)
+    if row2:
+        kb.row(*row2)
+
     series_dl_link = series.get("target_channel_link")
-    if not series_dl_link:
-        target_bot = clean_bot_username(get_random_worker())
-        series_dl_link = f"https://t.me/{target_bot}?start=ep_{ep_id}"
+    if series_dl_link:
+        kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
 
     safe_title = html.escape(str(series['title']))
     styled_title = to_bold_serif(safe_title)
@@ -1384,17 +1434,12 @@ def publish_episode_broadcast(call):
     caption = (
         f"✦ <b>{styled_title}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶ <b>Status :</b> {series.get('status', 'ONGOING')}\n"
-        f"▶ <b>Seasons :</b> {html.escape(str(series.get('season', '01')))}\n"
-        f"▶ <b>Episodes :</b> {html.escape(str(ep_data.get('ep_num', '01')))}\n"
-        f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-        f"▶ <b>Quality :</b> 480p , 720p , 1080p , HDRip\n"
+        f"🔥 <b>ɴᴇᴡ ᴇᴘɪsᴏᴅᴇ ʀᴇʟᴇᴀsᴇᴅ!</b>\n"
+        f"🎯 <b>sᴇᴀsᴏɴ :</b> {html.escape(str(series.get('season', '01')))} | <b>ᴇᴘɪsᴏᴅᴇ :</b> {html.escape(str(ep_data.get('ep_num', '01')))}\n"
+        f"🔊 <b>ᴀᴜᴅɪᴏ:</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"✦ <b>Powered By :</b> {html.escape(str(brand))}"
+        f"✦ <i>High speed direct download links are live below!</i>"
     )
-
-    kb = types.InlineKeyboardMarkup()
-    kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
 
     poster = series.get("poster")
     
