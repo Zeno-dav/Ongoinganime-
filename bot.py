@@ -26,12 +26,12 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7"
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7[span_3](start_span)!"[span_3](end_span)
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
     logger.info(f"Starting Flask server on port {port}...")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port)[span_4](start_span)[span_4](end_span)
 
 threading.Thread(target=run_flask_server, daemon=True).start()
 
@@ -39,12 +39,12 @@ threading.Thread(target=run_flask_server, daemon=True).start()
 class StyledInlineKeyboardButton(types.InlineKeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style
-        
+        self.style = style[span_5](start_span)[span_5](end_span)
+
 class StyledKeyboardButton(types.KeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style
+        self.style = style[span_6](start_span)[span_6](end_span)
 
 # ================= CONFIGURATION & CREDENTIALS =================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8438864084:AAHYlfWNfMORvIhJ1Q2rH895aFOFVWeH_2U").strip()
@@ -73,7 +73,7 @@ try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
     db = client["anime_master_db"]
     client.server_info()
-    logger.info("✅ Successfully connected to MongoDB Atlas!")
+    logger.info("✅ Successfully connected to MongoDB Atlas!")[span_7](start_span)[span_7](end_span)
 except Exception as e:
     logger.critical(f"❌ FATAL: MongoDB Connection Failed: {e}")
     sys.exit(1)
@@ -153,7 +153,7 @@ def is_vip(user_id):
         return True
     return vip_entry.get("expires_at", 0) > time.time()
 
-# ================= SMART CHANNEL RESOLVER =================
+# ================= SMART CHANNEL RESOLVER & ERROR NOTIFIER =================
 def get_safe_channel_link(chat_identifier):
     if not chat_identifier:
         return None
@@ -224,7 +224,7 @@ def notify_admin_error(context, error_obj):
     try:
         master_bot.send_message(
             OWNER_ID,
-            f"🚨 <b>System Error Alert!</b>\n\n📌 <b>Context:</b> {context}\n❌ <b>Error Details:</b> <code>{err_str}</code>",
+            f"🚨 <b>System Error Alert!</b>\n\n📌 <b>Context:</b> {context}\n❌ <b>Error Details:</b> <code>{html.escape(err_str)}</code>",
             parse_mode="HTML"
         )
     except Exception:
@@ -845,13 +845,20 @@ def handle_rebroadcast_single_episode(call):
 
     targets = set()
     if main_channel_id:
-        targets.add(str(main_channel_id))
+        success, resolved_main, _, _, err = resolve_channel_input(main_channel_id)
+        if success and resolved_main:
+            targets.add(str(resolved_main))
+        else:
+            targets.add(str(main_channel_id))
+            notify_admin_error("Main Channel Resolve Error during Single Rebroadcast", err)
+
     if raw_series_ch:
-        success, resolved_id, _, _, _ = resolve_channel_input(raw_series_ch)
+        success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
         if success and resolved_id:
             targets.add(str(resolved_id))
         else:
             targets.add(str(raw_series_ch))
+            notify_admin_error("Particular Channel Resolve Error during Single Rebroadcast", err)
 
     for chat_id in targets:
         try:
@@ -863,7 +870,7 @@ def handle_rebroadcast_single_episode(call):
             else:
                 master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Failed single episode broadcast to {chat_id}: {e}")
+            notify_admin_error(f"Failed single episode broadcast to chat {chat_id}", e)
 
     clean_screen(u, f"✅ <b>Episode {ep_num} re-broadcasted successfully to all channels!</b>")
     show_admin_panel(u)
@@ -940,14 +947,21 @@ def handle_series_completion_rebroadcast(call):
 
     targets = set()
     if main_ch:
-        targets.add(str(main_ch))
+        success, resolved_main, _, _, err = resolve_channel_input(main_ch)
+        if success and resolved_main:
+            targets.add(str(resolved_main))
+        else:
+            targets.add(str(main_ch))
+            notify_admin_error("Main Channel Resolve Error during Series Completion Rebroadcast", err)
+
     raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
     if raw_series_ch:
-        success, resolved_id, _, _, _ = resolve_channel_input(raw_series_ch)
+        success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
         if success and resolved_id:
             targets.add(str(resolved_id))
         else:
             targets.add(str(raw_series_ch))
+            notify_admin_error("Particular Channel Resolve Error during Series Completion Rebroadcast", err)
 
     new_sent_records = {}
     poster = series.get("poster")
@@ -962,7 +976,7 @@ def handle_series_completion_rebroadcast(call):
                 msg = master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
             new_sent_records[str(chat_id)] = msg.message_id
         except Exception as e:
-            logger.error(f"Failed completion broadcast to {chat_id}: {e}")
+            notify_admin_error(f"Failed completion broadcast to chat {chat_id}", e)
 
     col_series.update_one(
         {"_id": series["_id"]},
@@ -1386,14 +1400,21 @@ def publish_episode_broadcast(call):
     
     targets = set()
     if main_ch:
-        targets.add(str(main_ch))
+        success, resolved_main, _, _, err = resolve_channel_input(main_ch)
+        if success and resolved_main:
+            targets.add(str(resolved_main))
+        else:
+            targets.add(str(main_ch))
+            notify_admin_error("Main Channel Resolve Error during Publish", err)
+
     raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
     if raw_series_ch:
-        success, resolved_id, _, _, _ = resolve_channel_input(raw_series_ch)
+        success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
         if success and resolved_id:
             targets.add(str(resolved_id))
         else:
             targets.add(str(raw_series_ch))
+            notify_admin_error("Particular Channel Resolve Error during Publish", err)
 
     sent_msg_ids = series.get("broadcast_message_ids", {})
     success_count = 0
@@ -1410,7 +1431,7 @@ def publish_episode_broadcast(call):
             sent_msg_ids[str(chat_id)] = msg.message_id
             success_count += 1
         except Exception as e:
-            logger.error(f"Failed broadcast to {chat_id}: {e}")
+            notify_admin_error(f"Failed broadcast to chat {chat_id}", e)
 
     col_series.update_one(
         {"_id": series["_id"]},
