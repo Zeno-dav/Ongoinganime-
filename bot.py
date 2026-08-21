@@ -26,12 +26,12 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7[span_1](start_span)!"[span_1](end_span)
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7[span_3](start_span)!"[span_3](end_span)
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
     logger.info(f"Starting Flask server on port {port}...")
-    app.run(host="0.0.0.0", port=port)[span_2](start_span)[span_2](end_span)
+    app.run(host="0.0.0.0", port=port)[span_4](start_span)[span_4](end_span)
 
 threading.Thread(target=run_flask_server, daemon=True).start()
 
@@ -39,12 +39,12 @@ threading.Thread(target=run_flask_server, daemon=True).start()
 class StyledInlineKeyboardButton(types.InlineKeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_3](start_span)[span_3](end_span)
+        self.style = style[span_5](start_span)[span_5](end_span)
 
 class StyledKeyboardButton(types.KeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_4](start_span)[span_4](end_span)
+        self.style = style[span_6](start_span)[span_6](end_span)
 
 # ================= CONFIGURATION & CREDENTIALS =================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8045722822:AAG4BgNxs59oXZ8HSJIeZ4ZUmSgt4pKapfk").strip()
@@ -73,7 +73,7 @@ try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
     db = client["anime_master_db"]
     client.server_info()
-    logger.info("✅ Successfully connected to MongoDB Atlas!")[span_5](start_span)[span_5](end_span)
+    logger.info("✅ Successfully connected to MongoDB Atlas!")[span_7](start_span)[span_7](end_span)
 except Exception as e:
     logger.critical(f"❌ FATAL: MongoDB Connection Failed: {e}")
     sys.exit(1)
@@ -265,22 +265,23 @@ def auto_delete_daemon():
 
 threading.Thread(target=auto_delete_daemon, daemon=True).start()
 
-# ================= FSUB & ANILIST =================
+# ================= MAIN CHANNEL FSUB & ANILIST =================
 def check_fsub(bot_instance, user_id):
-    if is_vip(user_id):
-        return True, []
-    channels = list(col_fsub.find())
-    if not channels:
+    if is_vip(user_id) or is_admin(user_id):
         return True, []
     
     unsubbed = []
-    for ch in channels:
+    main_ch = get_setting("main_channel_id")
+    if main_ch:
         try:
-            m = bot_instance.get_chat_member(chat_id=ch["channel_id"], user_id=user_id)
+            chat = bot_instance.get_chat(main_ch)
+            m = bot_instance.get_chat_member(chat_id=main_ch, user_id=user_id)
             if m.status not in ["creator", "administrator", "member"]:
-                unsubbed.append({"title": ch["title"], "link": ch["invite_link"]})
+                link = chat.invite_link or (f"https://t.me/{chat.username}" if chat.username else f"https://t.me")
+                unsubbed.append({"title": chat.title or "Main Channel", "link": link})
         except Exception as e:
-            notify_admin_error(f"Force-Sub Check Error ({ch.get('title')})", e)
+            logger.error(f"Main Channel FSub Check Error: {e}")
+            
     return len(unsubbed) == 0, unsubbed
 
 def get_fsub_keyboard(unsubbed, start_param=""):
@@ -422,7 +423,7 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
     if not passed:
         bot_instance.send_message(
             u,
-            "⚠️ <b>Access Denied!</b>\n\nYou must join our official channels to download episodes:",
+            "⚠️ <b>Access Denied!</b>\n\nYou must join our official channel to download episodes:",
             reply_markup=get_fsub_keyboard(unsubbed, start_param)
         )
         return
@@ -435,7 +436,6 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             is_protected = (get_setting("protect_content") == "True")
             user_is_vip = is_vip(u)
             
-            # 1. Send File First
             if file_doc["file_type"] == "video":
                 sent = bot_instance.send_video(
                     chat_id=u,
@@ -451,7 +451,6 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
                     protect_content=is_protected
                 )
 
-            # 2. Send Notice Second & Schedule 30-min Auto Delete
             if user_is_vip:
                 bot_instance.send_message(
                     chat_id=u,
@@ -472,7 +471,6 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             bot_instance.send_message(u, "❌ <b>This download link is expired or does not exist.</b>")
         return
 
-    # Episode Selection Menu with Smart Navigation
     if start_param.startswith("ep_"):
         ep_id = start_param.replace("ep_", "")
         try:
@@ -882,7 +880,7 @@ def handle_delete_specific_episode(call):
     clean_screen(u, "✅ <b>Episode deleted successfully!</b>")
     show_admin_panel(u)
 
-# --- Series Completion & Rebroadcast Handler (Purane messages delete nahi honge) ---
+# --- Series Completion & Rebroadcast Handler ---
 @master_bot.callback_query_handler(func=lambda c: c.data.startswith("rebroadcast_s_"))
 def handle_series_completion_rebroadcast(call):
     master_bot.answer_callback_query(call.id)
@@ -1831,49 +1829,11 @@ def perform_rich_broadcast(message):
 @master_bot.callback_query_handler(func=lambda c: c.data == "admin_fsub_hub")
 def show_fsub_menu(call):
     master_bot.answer_callback_query(call.id)
-    channels = list(col_fsub.find())
-    text = "🛡️ <b>ForceSub Channels:</b>\n\n"
-    for i, ch in enumerate(channels, 1):
-        text += f"{i}. <b>{ch['title']}</b> (<code>{ch['channel_id']}</code>)\n"
-
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        StyledInlineKeyboardButton(text="➕ Add ForceSub Channel", callback_data="add_fsub_ch", style="success"),
-        StyledInlineKeyboardButton(text="🗑️ Remove ForceSub Channel", callback_data="rem_fsub_ch", style="danger"),
-        StyledInlineKeyboardButton(text="🔙 Back", callback_data="admin_hub", style="danger")
-    )
+    main_ch = get_setting("main_channel_id")
+    text = f"🛡️ <b>ForceSub Hub:</b>\n\nCurrent Force-Sub is set to your <b>Main Channel</b>: {get_channel_title(main_ch)}\n\n<i>All users must join this channel to use the bot.</i>"
+    kb = types.InlineKeyboardMarkup()
+    kb.add(StyledInlineKeyboardButton(text="🔙 Back", callback_data="admin_hub", style="danger"))
     clean_screen(call.message.chat.id, text, reply_markup=kb)
-
-@master_bot.callback_query_handler(func=lambda c: c.data == "add_fsub_ch")
-def start_add_fsub(call):
-    master_bot.answer_callback_query(call.id)
-    msg = clean_screen(call.message.chat.id, "📢 <b>Send ForceSub Channel Username or ID:</b>")
-    master_bot.register_next_step_handler(msg, step_save_fsub)
-
-def step_save_fsub(message):
-    remove_user_msg(message)
-    success, cid, title, safe_link, err = resolve_channel_input(message.text)
-    if success:
-        col_fsub.update_one({"channel_id": cid}, {"$set": {"channel_id": cid, "title": title, "invite_link": safe_link}}, upsert=True)
-        clean_screen(message.chat.id, f"✅ ForceSub Added: <b>{title}</b>")
-    show_admin_panel(message.chat.id)
-
-@master_bot.callback_query_handler(func=lambda c: c.data == "rem_fsub_ch")
-def remove_fsub_menu(call):
-    master_bot.answer_callback_query(call.id)
-    channels = list(col_fsub.find())
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    for ch in channels:
-        kb.add(StyledInlineKeyboardButton(text=f"❌ {ch['title']}", callback_data=f"del_fsub_{ch['channel_id']}", style="danger"))
-    kb.add(StyledInlineKeyboardButton(text="🔙 Back", callback_data="admin_fsub_hub", style="primary"))
-    clean_screen(call.message.chat.id, "🗑️ <b>Select channel to remove:</b>", reply_markup=kb)
-
-@master_bot.callback_query_handler(func=lambda c: c.data.startswith("del_fsub_"))
-def perform_del_fsub(call):
-    master_bot.answer_callback_query(call.id)
-    cid = int(call.data.replace("del_fsub_", ""))
-    col_fsub.delete_one({"channel_id": cid})
-    show_fsub_menu(call)
 
 # ================= LIVE STATS =================
 @master_bot.callback_query_handler(func=lambda c: c.data == "admin_stats")
