@@ -47,7 +47,7 @@ class StyledKeyboardButton(types.KeyboardButton):
         self.style = style[span_5](start_span)[span_5](end_span)
 
 # ================= CONFIGURATION & CREDENTIALS =================
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8045722822:AAHVPtdj-iV0Xef4OklOXQvdZn2imAeUK98").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8045722822:AAG4BgNxs59oXZ8HSJIeZ4ZUmSgt4pKapfk").strip()
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://skanis2008_db_user:skanis09@zeno.dzdqoaj.mongodb.net/?appName=Zeno").strip()
 OWNER_ID_RAW = os.getenv("ADMIN_ID", "5659051138").strip()
 
