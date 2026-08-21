@@ -26,12 +26,12 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7[span_1](start_span)!"[span_1](end_span)
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7[span_2](start_span)!"[span_2](end_span)
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
     logger.info(f"Starting Flask server on port {port}...")
-    app.run(host="0.0.0.0", port=port)[span_2](start_span)[span_2](end_span)
+    app.run(host="0.0.0.0", port=port)[span_3](start_span)[span_3](end_span)
 
 threading.Thread(target=run_flask_server, daemon=True).start()
 
@@ -39,12 +39,12 @@ threading.Thread(target=run_flask_server, daemon=True).start()
 class StyledInlineKeyboardButton(types.InlineKeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_3](start_span)[span_3](end_span)
+        self.style = style[span_4](start_span)[span_4](end_span)
 
 class StyledKeyboardButton(types.KeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_4](start_span)[span_4](end_span)
+        self.style = style[span_5](start_span)[span_5](end_span)
 
 # ================= CONFIGURATION & CREDENTIALS =================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8045722822:AAHVPtdj-iV0Xef4OklOXQvdZn2imAeUK98").strip()
@@ -73,7 +73,7 @@ try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
     db = client["anime_master_db"]
     client.server_info()
-    logger.info("✅ Successfully connected to MongoDB Atlas!")[span_5](start_span)[span_5](end_span)
+    logger.info("✅ Successfully connected to MongoDB Atlas!")[span_6](start_span)[span_6](end_span)
 except Exception as e:
     logger.critical(f"❌ FATAL: MongoDB Connection Failed: {e}")
     sys.exit(1)
@@ -115,7 +115,7 @@ def clean_bot_username(username):
         return get_master_username().replace("@", "").strip()
     return str(username).replace("@", "").strip()
 
-# ================= FONT STYLIZERS (𝐀𝐁𝐂𝐃 & ᴀʙᴄᴅ) =================
+# ================= FONT STYLIZERS =================
 def to_bold_serif(text: str) -> str:
     result = []
     for char in str(text):
@@ -265,13 +265,32 @@ def auto_delete_daemon():
 
 threading.Thread(target=auto_delete_daemon, daemon=True).start()
 
-# ================= FSUB DISABLED (BYPASSED COMPLETELY) =================
+# ================= MAIN CHANNEL FORCESUB =================
 def check_fsub(bot_instance, user_id):
-    # ForceSub disabled completely so users never get blocked
-    return True, []
+    if is_vip(user_id) or is_admin(user_id):
+        return True, []
+    
+    unsubbed = []
+    main_ch = get_setting("main_channel_id")
+    if main_ch:
+        try:
+            chat = bot_instance.get_chat(main_ch)
+            m = bot_instance.get_chat_member(chat_id=main_ch, user_id=user_id)
+            if m.status not in ["creator", "administrator", "member"]:
+                link = chat.invite_link or (f"https://t.me/{chat.username}" if chat.username else f"https://t.me")
+                unsubbed.append({"title": chat.title or "Main Channel", "link": link})
+        except Exception as e:
+            logger.error(f"Main Channel FSub Check Error: {e}")
+            
+    return len(unsubbed) == 0, unsubbed
 
 def get_fsub_keyboard(unsubbed, start_param=""):
-    return types.InlineKeyboardMarkup()
+    kb = types.InlineKeyboardMarkup()
+    for ch in unsubbed:
+        kb.add(StyledInlineKeyboardButton(text=f"🔔 Join {ch['title']}", url=ch["link"], style="primary"))
+    retry_cb = f"retry_{start_param}" if start_param else "retry_main"
+    kb.add(StyledInlineKeyboardButton(text="🔄 Verify & Try Again", callback_data=retry_cb, style="success"))
+    return kb
 
 def extract_file(message):
     if message.video:
