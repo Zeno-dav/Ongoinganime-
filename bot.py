@@ -26,12 +26,12 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7[span_3](start_span)!"[span_3](end_span)
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7"
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
     logger.info(f"Starting Flask server on port {port}...")
-    app.run(host="0.0.0.0", port=port)[span_4](start_span)[span_4](end_span)
+    app.run(host="0.0.0.0", port=port)
 
 threading.Thread(target=run_flask_server, daemon=True).start()
 
@@ -39,12 +39,12 @@ threading.Thread(target=run_flask_server, daemon=True).start()
 class StyledInlineKeyboardButton(types.InlineKeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_5](start_span)[span_5](end_span)
+        self.style = style
 
 class StyledKeyboardButton(types.KeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_6](start_span)[span_6](end_span)
+        self.style = style
 
 # ================= CONFIGURATION & CREDENTIALS =================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8438864084:AAHYlfWNfMORvIhJ1Q2rH895aFOFVWeH_2U").strip()
@@ -73,7 +73,7 @@ try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
     db = client["anime_master_db"]
     client.server_info()
-    logger.info("✅ Successfully connected to MongoDB Atlas!")[span_7](start_span)[span_7](end_span)
+    logger.info("✅ Successfully connected to MongoDB Atlas!")
 except Exception as e:
     logger.critical(f"❌ FATAL: MongoDB Connection Failed: {e}")
     sys.exit(1)
