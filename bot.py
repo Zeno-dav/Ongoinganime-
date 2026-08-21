@@ -26,12 +26,12 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7[span_2](start_span)!"[span_2](end_span)
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7!"
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
     logger.info(f"Starting Flask server on port {port}...")
-    app.run(host="0.0.0.0", port=port)[span_3](start_span)[span_3](end_span)
+    app.run(host="0.0.0.0", port=port)
 
 threading.Thread(target=run_flask_server, daemon=True).start()
 
@@ -39,15 +39,15 @@ threading.Thread(target=run_flask_server, daemon=True).start()
 class StyledInlineKeyboardButton(types.InlineKeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_4](start_span)[span_4](end_span)
+        self.style = style
 
 class StyledKeyboardButton(types.KeyboardButton):
     def __init__(self, text, style=None, *args, **kwargs):
         super().__init__(text=text, *args, **kwargs)
-        self.style = style[span_5](start_span)[span_5](end_span)
+        self.style = style
 
 # ================= CONFIGURATION & CREDENTIALS =================
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8045722822:AAHVPtdj-iV0Xef4OklOXQvdZn2imAeUK98").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8045722822:AAG4BgNxs59oXZ8HSJIeZ4ZUmSgt4pKapfk").strip()
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://skanis2008_db_user:skanis09@zeno.dzdqoaj.mongodb.net/?appName=Zeno").strip()
 OWNER_ID_RAW = os.getenv("ADMIN_ID", "5659051138").strip()
 
@@ -73,7 +73,7 @@ try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
     db = client["anime_master_db"]
     client.server_info()
-    logger.info("✅ Successfully connected to MongoDB Atlas!")[span_6](start_span)[span_6](end_span)
+    logger.info("✅ Successfully connected to MongoDB Atlas!")
 except Exception as e:
     logger.critical(f"❌ FATAL: MongoDB Connection Failed: {e}")
     sys.exit(1)
@@ -115,7 +115,7 @@ def clean_bot_username(username):
         return get_master_username().replace("@", "").strip()
     return str(username).replace("@", "").strip()
 
-# ================= FONT STYLIZERS =================
+# ================= FONT STYLIZERS (𝐀𝐁𝐂𝐃 & ᴀʙᴄᴅ) =================
 def to_bold_serif(text: str) -> str:
     result = []
     for char in str(text):
@@ -265,23 +265,22 @@ def auto_delete_daemon():
 
 threading.Thread(target=auto_delete_daemon, daemon=True).start()
 
-# ================= MAIN CHANNEL FORCESUB =================
+# ================= FSUB & ANILIST =================
 def check_fsub(bot_instance, user_id):
-    if is_vip(user_id) or is_admin(user_id):
+    if is_vip(user_id):
+        return True, []
+    channels = list(col_fsub.find())
+    if not channels:
         return True, []
     
     unsubbed = []
-    main_ch = get_setting("main_channel_id")
-    if main_ch:
+    for ch in channels:
         try:
-            chat = bot_instance.get_chat(main_ch)
-            m = bot_instance.get_chat_member(chat_id=main_ch, user_id=user_id)
+            m = bot_instance.get_chat_member(chat_id=ch["channel_id"], user_id=user_id)
             if m.status not in ["creator", "administrator", "member"]:
-                link = chat.invite_link or (f"https://t.me/{chat.username}" if chat.username else f"https://t.me")
-                unsubbed.append({"title": chat.title or "Main Channel", "link": link})
+                unsubbed.append({"title": ch["title"], "link": ch["invite_link"]})
         except Exception as e:
-            logger.error(f"Main Channel FSub Check Error: {e}")
-            
+            notify_admin_error(f"Force-Sub Check Error ({ch.get('title')})", e)
     return len(unsubbed) == 0, unsubbed
 
 def get_fsub_keyboard(unsubbed, start_param=""):
@@ -423,7 +422,7 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
     if not passed:
         bot_instance.send_message(
             u,
-            "⚠️ <b>Access Denied!</b>\n\nYou must join our official channel to download episodes:",
+            "⚠️ <b>Access Denied!</b>\n\nYou must join our official channels to download episodes:",
             reply_markup=get_fsub_keyboard(unsubbed, start_param)
         )
         return
@@ -436,6 +435,7 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             is_protected = (get_setting("protect_content") == "True")
             user_is_vip = is_vip(u)
             
+            # 1. Send File First
             if file_doc["file_type"] == "video":
                 sent = bot_instance.send_video(
                     chat_id=u,
@@ -451,6 +451,7 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
                     protect_content=is_protected
                 )
 
+            # 2. Send Notice Second & Schedule 30-min Auto Delete
             if user_is_vip:
                 bot_instance.send_message(
                     chat_id=u,
@@ -471,6 +472,7 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             bot_instance.send_message(u, "❌ <b>This download link is expired or does not exist.</b>")
         return
 
+    # Episode Selection Menu with Smart Navigation
     if start_param.startswith("ep_"):
         ep_id = start_param.replace("ep_", "")
         try:
@@ -511,7 +513,7 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             caption = (
                 f"✦ <b>{styled_title}</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━━━\n"
-                f"▶ <b>Status :</b> {series.get('status', 'ONGOING')}\n"
+                f"▶ <b>Status :</b> ONGOING\n"
                 f"▶ <b>Seasons :</b> {html.escape(str(series.get('season', '01')))}\n"
                 f"▶ <b>Episodes :</b> {html.escape(str(ep_doc.get('ep_num', '01')))}\n"
                 f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
@@ -705,7 +707,7 @@ def view_series_details(call):
     caption = (
         f"✦ <b>{styled_title}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶ <b>Status :</b> {series.get('status', 'ONGOING')}\n"
+        f"▶ <b>Status :</b> ONGOING\n"
         f"▶ <b>Season :</b> {html.escape(str(series.get('season', '01')))}\n"
         f"▶ <b>Total Episodes :</b> {ep_count}\n"
         f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
@@ -716,261 +718,11 @@ def view_series_details(call):
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
         StyledInlineKeyboardButton(text="🎬 Upload Episode", callback_data=f"sel_ep_up_{sid}", style="success"),
-        StyledInlineKeyboardButton(text="📂 Manage Episodes", callback_data=f"manage_eps_{sid}", style="primary"),
         StyledInlineKeyboardButton(text="✏️ Edit Series Info", callback_data=f"edit_s_menu_{sid}", style="primary"),
-        StyledInlineKeyboardButton(text="📢 Complete & Rebroadcast", callback_data=f"rebroadcast_s_{sid}", style="success"),
         StyledInlineKeyboardButton(text="🗑️ Delete Series", callback_data=f"del_s_conf_{sid}", style="danger"),
-        StyledInlineKeyboardButton(text="🔙 Series Hub", callback_data="admin_series_hub", style="danger")
+        StyledInlineKeyboardButton(text="🔙 Series Hub", callback_data="admin_series_hub", style="primary")
     )
     clean_screen(u, caption, reply_markup=kb, photo=series.get("poster"))
-
-# --- Manage Episodes List & Actions ---
-@master_bot.callback_query_handler(func=lambda c: c.data.startswith("manage_eps_"))
-def handle_manage_episodes(call):
-    master_bot.answer_callback_query(call.id)
-    u = call.message.chat.id
-    sid = call.data.replace("manage_eps_", "")
-    series = col_series.find_one({"_id": ObjectId(sid)})
-    if not series:
-        return
-
-    episodes = list(col_episodes.find({"series_id": series["_id"]}).sort("ep_num", 1))
-    if not episodes:
-        kb = types.InlineKeyboardMarkup()
-        kb.add(StyledInlineKeyboardButton(text="🔙 Back", callback_data=f"view_s_{sid}", style="danger"))
-        clean_screen(u, f"⚠️ No episodes found for <b>{series['title']}</b>.", reply_markup=kb)
-        return
-
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    for ep in episodes:
-        kb.add(StyledInlineKeyboardButton(text=f"Ep {ep.get('ep_num', '01')}", callback_data=f"edit_ep_{ep['_id']}", style="primary"))
-    kb.add(StyledInlineKeyboardButton(text="🔙 Back to Series", callback_data=f"view_s_{sid}", style="danger"))
-    clean_screen(u, f"📂 <b>Manage Episodes:</b> Select episode to edit or re-broadcast:", reply_markup=kb)
-
-@master_bot.callback_query_handler(func=lambda c: c.data.startswith("edit_ep_"))
-def handle_edit_specific_episode(call):
-    master_bot.answer_callback_query(call.id)
-    u = call.message.chat.id
-    epid = call.data.replace("edit_ep_", "")
-    ep = col_episodes.find_one({"_id": ObjectId(epid)})
-    if not ep:
-        return
-    series = col_series.find_one({"_id": ep["series_id"]})
-
-    text = (
-        f"🎬 <b>Episode Management:</b> {series['title']} - Ep {ep.get('ep_num')}\n\n"
-        f"📁 <b>Available Qualities:</b> {list(ep.get('files', {}).keys())}\n\n"
-        f"Choose an action:"
-    )
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        StyledInlineKeyboardButton(text="📤 Replace / Update File (720p)", callback_data=f"rep_file_{epid}_720p", style="primary"),
-        StyledInlineKeyboardButton(text="🚀 Re-broadcast this Episode", callback_data=f"rebroadcast_ep_{epid}", style="success"),
-        StyledInlineKeyboardButton(text="🗑️ Delete Episode", callback_data=f"del_ep_{epid}", style="danger"),
-        StyledInlineKeyboardButton(text=f"🔙 Back", callback_data=f"manage_eps_{series['_id']}", style="danger")
-    )
-    clean_screen(u, text, reply_markup=kb)
-
-@master_bot.callback_query_handler(func=lambda c: c.data.startswith("rep_file_"))
-def prompt_replace_ep_file(call):
-    master_bot.answer_callback_query(call.id)
-    u = call.message.chat.id
-    parts = call.data.replace("rep_file_", "").split("_")
-    epid, quality = parts[0], parts[1]
-    update_session(u, {"replacing_epid": epid, "replacing_quality": quality})
-
-    msg = clean_screen(u, f"📤 <b>Send new Video/Document for [{quality}] replacement:</b>")
-    master_bot.register_next_step_handler(msg, step_save_replaced_file)
-
-def step_save_replaced_file(message):
-    remove_user_msg(message)
-    u = message.chat.id
-    fid, ftype, fname = extract_file(message)
-    if not fid:
-        clean_screen(u, "❌ Invalid file! Upload cancelled.")
-        show_admin_panel(u)
-        return
-
-    session = get_session(u)
-    epid = session.get("replacing_epid")
-    quality = session.get("replacing_quality", "720p")
-
-    ep = col_episodes.find_one({"_id": ObjectId(epid)})
-    series = col_series.find_one({"_id": ep["series_id"]})
-
-    file_key = f"file_{uuid.uuid4().hex[:10]}"
-    col_files.insert_one({
-        "file_key": file_key,
-        "file_id": fid,
-        "file_type": ftype,
-        "file_name": f"{series.get('title', 'Anime')} - S{series.get('season', '01')}E{ep.get('ep_num', '01')} [{quality}]",
-        "created_at": time.time()
-    })
-
-    col_episodes.update_one({"_id": ObjectId(epid)}, {"$set": {f"files.{quality}": file_key}})
-    clean_screen(u, f"✅ <b>Episode {ep.get('ep_num')} [{quality}] file updated successfully!</b>")
-    show_admin_panel(u)
-
-@master_bot.callback_query_handler(func=lambda c: c.data.startswith("rebroadcast_ep_"))
-def handle_rebroadcast_single_episode(call):
-    master_bot.answer_callback_query(call.id)
-    u = call.message.chat.id
-    epid = call.data.replace("rebroadcast_ep_", "")
-    ep = col_episodes.find_one({"_id": ObjectId(epid)})
-    if not ep:
-        return
-    series = col_series.find_one({"_id": ep["series_id"]})
-
-    series_title = series.get("title", "Unknown Series")
-    poster = series.get("poster")
-    season = series.get("season", "01")
-    ep_num = ep.get("ep_num", "01")
-    audio = series.get("audio", "Japanese [Eng-Sub]")
-    ep_id = str(ep["_id"])
-
-    main_channel_id = get_setting("main_channel_id")
-    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
-
-    kb = types.InlineKeyboardMarkup()
-    worker_un = clean_bot_username(get_random_worker())
-    kb.add(StyledInlineKeyboardButton(text="🚀 Download Now ↗", url=f"https://t.me/{worker_un}?start=ep_{ep_id}", style="success"))
-
-    caption = (
-        f"🔥 <b>NEW EPISODE RELEASED!</b>\n\n"
-        f"📺 <b>{html.escape(str(series_title))}</b>\n"
-        f"🎯 <b>Season :</b> {html.escape(str(season))} | <b>Episode :</b> {html.escape(str(ep_num))}\n"
-        f"🔊 <b>Audio:</b> {html.escape(str(audio))}\n\n"
-        f"✦ <i>High speed direct download links are now live below!</i>"
-    )
-
-    targets = set()
-    if main_channel_id:
-        targets.add(str(main_channel_id))
-    if raw_series_ch:
-        success, resolved_id, _, _, _ = resolve_channel_input(raw_series_ch)
-        if success and resolved_id:
-            targets.add(str(resolved_id))
-        else:
-            targets.add(str(raw_series_ch))
-
-    for chat_id in targets:
-        try:
-            if str(chat_id).startswith("http") or "+" in str(chat_id):
-                continue
-            chat_target = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
-            if poster:
-                master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=kb, parse_mode="HTML")
-            else:
-                master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
-        except Exception as e:
-            logger.error(f"Failed single episode broadcast to {chat_id}: {e}")
-
-    clean_screen(u, f"✅ <b>Episode {ep_num} re-broadcasted successfully to all channels!</b>")
-    show_admin_panel(u)
-
-@master_bot.callback_query_handler(func=lambda c: c.data.startswith("del_ep_"))
-def handle_delete_specific_episode(call):
-    master_bot.answer_callback_query(call.id)
-    u = call.message.chat.id
-    epid = call.data.replace("del_ep_", "")
-    ep = col_episodes.find_one({"_id": ObjectId(epid)})
-    if not ep:
-        return
-    col_episodes.delete_one({"_id": ObjectId(epid)})
-    clean_screen(u, "✅ <b>Episode deleted successfully!</b>")
-    show_admin_panel(u)
-
-# --- Series Completion & Rebroadcast Handler ---
-@master_bot.callback_query_handler(func=lambda c: c.data.startswith("rebroadcast_s_"))
-def handle_series_completion_rebroadcast(call):
-    master_bot.answer_callback_query(call.id)
-    u = call.message.chat.id
-    sid = call.data.replace("rebroadcast_s_", "")
-    series = col_series.find_one({"_id": ObjectId(sid)})
-    if not series:
-        clean_screen(u, "❌ Series not found.")
-        return
-
-    latest_ep = list(col_episodes.find({"series_id": series["_id"]}).sort("ep_num", -1).limit(1))
-    if not latest_ep:
-        clean_screen(u, "❌ No episodes found for this series to broadcast!")
-        return
-
-    ep_doc = latest_ep[0]
-    col_series.update_one({"_id": series["_id"]}, {"$set": {"status": "COMPLETED"}})
-    series["status"] = "COMPLETED"
-
-    main_ch = get_setting("main_channel_id")
-    brand = get_setting("brand_name")
-    ep_id = str(ep_doc["_id"])
-    series_dl_link = series.get("target_channel_link")
-    if not series_dl_link:
-        target_bot = clean_bot_username(get_random_worker())
-        series_dl_link = f"https://t.me/{target_bot}?start=ep_{ep_id}"
-
-    safe_title = html.escape(str(series['title']))
-    styled_title = to_bold_serif(safe_title)
-
-    files = ep_doc.get("files", {})
-    kb = types.InlineKeyboardMarkup()
-    w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
-    row1 = [
-        StyledInlineKeyboardButton(text="📥 Download 480p", url=f"https://t.me/{w1}?start={files.get('480p', ep_id)}", style="primary"),
-        StyledInlineKeyboardButton(text="📥 Download 720p", url=f"https://t.me/{w2}?start={files.get('720p', ep_id)}", style="primary")
-    ]
-    row2 = [
-        StyledInlineKeyboardButton(text="📥 Download 1080p", url=f"https://t.me/{w3}?start={files.get('1080p', ep_id)}", style="primary"),
-        StyledInlineKeyboardButton(text="📥 Download HDRip", url=f"https://t.me/{w4}?start={files.get('HDRip', ep_id)}", style="primary")
-    ]
-    kb.row(*row1)
-    kb.row(*row2)
-    kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
-
-    caption = (
-        f"✦ <b>{styled_title}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶ <b>Status :</b> COMPLETED\n"
-        f"▶ <b>Seasons :</b> {html.escape(str(series.get('season', '01')))}\n"
-        f"▶ <b>Total Episodes :</b> {html.escape(str(ep_doc.get('ep_num', '01')))}\n"
-        f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-        f"▶ <b>Quality :</b> 480p , 720p , 1080p , HDRip\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"✦ <b>Powered By :</b> {html.escape(str(brand))}"
-    )
-
-    targets = set()
-    if main_ch:
-        targets.add(str(main_ch))
-    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
-    if raw_series_ch:
-        success, resolved_id, _, _, _ = resolve_channel_input(raw_series_ch)
-        if success and resolved_id:
-            targets.add(str(resolved_id))
-        else:
-            targets.add(str(raw_series_ch))
-
-    new_sent_records = {}
-    poster = series.get("poster")
-    for chat_id in targets:
-        try:
-            if str(chat_id).startswith("http") or "+" in str(chat_id):
-                continue
-            chat_target = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
-            if poster:
-                msg = master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=kb, parse_mode="HTML")
-            else:
-                msg = master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
-            new_sent_records[str(chat_id)] = msg.message_id
-        except Exception as e:
-            logger.error(f"Failed completion broadcast to {chat_id}: {e}")
-
-    col_series.update_one(
-        {"_id": series["_id"]},
-        {"$set": {"broadcast_message_ids": new_sent_records, "status": "COMPLETED"}}
-    )
-
-    clean_screen(u, "✅ <b>Series marked as COMPLETED and broadcasted successfully to Main Channel & Particular Channel!</b>")
-    show_admin_panel(u)
 
 # --- Full Edit Series Menu ---
 @master_bot.callback_query_handler(func=lambda c: c.data.startswith("edit_s_menu_"))
@@ -1293,7 +1045,7 @@ def show_quality_upload_menu(chat_id):
     kb.row(*row2)
     
     if files:
-        kb.add(StyledInlineKeyboardButton(text="🚀 Publish to Channels", callback_data="publish_episode", style="success"))
+        kb.add(StyledInlineKeyboardButton(text="🚀 Publish to Main Channel", callback_data="publish_episode", style="success"))
     kb.add(StyledInlineKeyboardButton(text="❌ Cancel", callback_data="admin_hub", style="danger"))
 
     clean_screen(chat_id, f"🎬 <b>Series:</b> {series.get('title')}\n🔢 <b>Episode:</b> {ep_data.get('ep_num')}\n\nTap quality to upload video:", reply_markup=kb)
@@ -1335,7 +1087,7 @@ def step_receive_file(message):
     col_sessions.update_one({"user_id": u}, {"$set": {f"upload_ep.files.{quality}": file_key}})
     show_quality_upload_menu(u)
 
-# ================= BROADCAST TO MAIN & PARTICULAR SERIES CHANNEL =================
+# ================= BROADCAST WITH SPECIFIC SERIES DOWNLOAD LINK =================
 @master_bot.callback_query_handler(func=lambda c: c.data == "publish_episode")
 def publish_episode_broadcast(call):
     master_bot.answer_callback_query(call.id)
@@ -1359,6 +1111,7 @@ def publish_episode_broadcast(call):
     brand = get_setting("brand_name")
     ep_id = str(ep_res.inserted_id)
 
+    # 1. Specific Link configured during Series registration
     series_dl_link = series.get("target_channel_link")
     if not series_dl_link:
         target_bot = clean_bot_username(get_random_worker())
@@ -1370,7 +1123,7 @@ def publish_episode_broadcast(call):
     caption = (
         f"✦ <b>{styled_title}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶ <b>Status :</b> {series.get('status', 'ONGOING')}\n"
+        f"▶ <b>Status :</b> ONGOING\n"
         f"▶ <b>Seasons :</b> {html.escape(str(series.get('season', '01')))}\n"
         f"▶ <b>Episodes :</b> {html.escape(str(ep_data.get('ep_num', '01')))}\n"
         f"▶ <b>Audio :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
@@ -1379,48 +1132,28 @@ def publish_episode_broadcast(call):
         f"✦ <b>Powered By :</b> {html.escape(str(brand))}"
     )
 
+    # Single Download Link Button pointing directly to the series specific channel
     kb = types.InlineKeyboardMarkup()
     kb.add(StyledInlineKeyboardButton(text="⛩️ Download Now ⛩️", url=series_dl_link, style="success"))
 
+    if not main_ch:
+        clean_screen(u, "⚠️ Main Channel is not set in Global Settings!")
+        clear_session(u)
+        show_admin_panel(u)
+        return
+
+    dest_chat = int(main_ch) if str(main_ch).replace("-", "").isdigit() else main_ch
     poster = series.get("poster")
-    
-    targets = set()
-    if main_ch:
-        targets.add(str(main_ch))
-    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
-    if raw_series_ch:
-        success, resolved_id, _, _, _ = resolve_channel_input(raw_series_ch)
-        if success and resolved_id:
-            targets.add(str(resolved_id))
+
+    try:
+        if poster:
+            master_bot.send_photo(chat_id=dest_chat, photo=poster, caption=caption, reply_markup=kb, parse_mode="HTML")
         else:
-            targets.add(str(raw_series_ch))
-
-    sent_msg_ids = series.get("broadcast_message_ids", {})
-    success_count = 0
-
-    for chat_id in targets:
-        try:
-            if str(chat_id).startswith("http") or "+" in str(chat_id):
-                continue
-            chat_target = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
-            if poster:
-                msg = master_bot.send_photo(chat_id=chat_target, photo=poster, caption=caption, reply_markup=kb, parse_mode="HTML")
-            else:
-                msg = master_bot.send_message(chat_id=chat_target, text=caption, reply_markup=kb, parse_mode="HTML")
-            sent_msg_ids[str(chat_id)] = msg.message_id
-            success_count += 1
-        except Exception as e:
-            logger.error(f"Failed broadcast to {chat_id}: {e}")
-
-    col_series.update_one(
-        {"_id": series["_id"]},
-        {"$set": {"broadcast_message_ids": sent_msg_ids}}
-    )
-
-    if success_count > 0:
-        clean_screen(u, f"✅ <b>Published successfully to Main Channel & Particular Series Channel!</b>\n\nLink: <code>{series_dl_link}</code>")
-    else:
-        clean_screen(u, f"⚠️ Broadcast warning: Check channel IDs and bot admin permissions in your channels.")
+            master_bot.send_message(chat_id=dest_chat, text=caption, reply_markup=kb, parse_mode="HTML")
+        clean_screen(u, f"✅ <b>Published to Main Channel with Series Specific Link:</b>\n<code>{series_dl_link}</code>")
+    except Exception as e:
+        notify_admin_error("Broadcast Failed", e)
+        clean_screen(u, f"⚠️ Broadcast Error: <code>{e}</code>\n\nVerify bot is Admin in Main Channel: <code>{dest_chat}</code>")
 
     clear_session(u)
     show_admin_panel(u)
@@ -1829,11 +1562,49 @@ def perform_rich_broadcast(message):
 @master_bot.callback_query_handler(func=lambda c: c.data == "admin_fsub_hub")
 def show_fsub_menu(call):
     master_bot.answer_callback_query(call.id)
-    main_ch = get_setting("main_channel_id")
-    text = f"🛡️ <b>ForceSub Hub:</b>\n\nCurrent Force-Sub is set to your <b>Main Channel</b>: {get_channel_title(main_ch)}\n\n<i>All users must join this channel to use the bot.</i>"
-    kb = types.InlineKeyboardMarkup()
-    kb.add(StyledInlineKeyboardButton(text="🔙 Back", callback_data="admin_hub", style="danger"))
+    channels = list(col_fsub.find())
+    text = "🛡️ <b>ForceSub Channels:</b>\n\n"
+    for i, ch in enumerate(channels, 1):
+        text += f"{i}. <b>{ch['title']}</b> (<code>{ch['channel_id']}</code>)\n"
+
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        StyledInlineKeyboardButton(text="➕ Add ForceSub Channel", callback_data="add_fsub_ch", style="success"),
+        StyledInlineKeyboardButton(text="🗑️ Remove ForceSub Channel", callback_data="rem_fsub_ch", style="danger"),
+        StyledInlineKeyboardButton(text="🔙 Back", callback_data="admin_hub", style="danger")
+    )
     clean_screen(call.message.chat.id, text, reply_markup=kb)
+
+@master_bot.callback_query_handler(func=lambda c: c.data == "add_fsub_ch")
+def start_add_fsub(call):
+    master_bot.answer_callback_query(call.id)
+    msg = clean_screen(call.message.chat.id, "📢 <b>Send ForceSub Channel Username or ID:</b>")
+    master_bot.register_next_step_handler(msg, step_save_fsub)
+
+def step_save_fsub(message):
+    remove_user_msg(message)
+    success, cid, title, safe_link, err = resolve_channel_input(message.text)
+    if success:
+        col_fsub.update_one({"channel_id": cid}, {"$set": {"channel_id": cid, "title": title, "invite_link": safe_link}}, upsert=True)
+        clean_screen(message.chat.id, f"✅ ForceSub Added: <b>{title}</b>")
+    show_admin_panel(message.chat.id)
+
+@master_bot.callback_query_handler(func=lambda c: c.data == "rem_fsub_ch")
+def remove_fsub_menu(call):
+    master_bot.answer_callback_query(call.id)
+    channels = list(col_fsub.find())
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    for ch in channels:
+        kb.add(StyledInlineKeyboardButton(text=f"❌ {ch['title']}", callback_data=f"del_fsub_{ch['channel_id']}", style="danger"))
+    kb.add(StyledInlineKeyboardButton(text="🔙 Back", callback_data="admin_fsub_hub", style="primary"))
+    clean_screen(call.message.chat.id, "🗑️ <b>Select channel to remove:</b>", reply_markup=kb)
+
+@master_bot.callback_query_handler(func=lambda c: c.data.startswith("del_fsub_"))
+def perform_del_fsub(call):
+    master_bot.answer_callback_query(call.id)
+    cid = int(call.data.replace("del_fsub_", ""))
+    col_fsub.delete_one({"channel_id": cid})
+    show_fsub_menu(call)
 
 # ================= LIVE STATS =================
 @master_bot.callback_query_handler(func=lambda c: c.data == "admin_stats")
