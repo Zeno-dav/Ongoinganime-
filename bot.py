@@ -26,7 +26,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7!"
+    return "✅ Ongoing Anime Multi-Bot Cluster is Active & Running 24/7"
 
 def run_flask_server():
     port = int(os.environ.get("PORT", 8080))
@@ -47,7 +47,7 @@ class StyledKeyboardButton(types.KeyboardButton):
         self.style = style
 
 # ================= CONFIGURATION & CREDENTIALS =================
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8438864084:AAHYlfWNfMORvIhJ1Q2rH895aFOFVWeH_2U").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8045722822:AAG4BgNxs59oXZ8HSJIeZ4ZUmSgt4pKapfk").strip()
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://skanis2008_db_user:skanis09@zeno.dzdqoaj.mongodb.net/?appName=Zeno").strip()
 OWNER_ID_RAW = os.getenv("ADMIN_ID", "5659051138").strip()
 
@@ -380,24 +380,6 @@ def remove_user_msg(message):
     except Exception:
         pass
 
-# ================= CHAT ID EXTRACTOR & FORWARD DETECT =================
-@master_bot.message_handler(func=lambda msg: is_admin(msg.chat.id) and msg.forward_from_chat is not None)
-def handle_forwarded_channel_id(message):
-    remove_user_msg(message)
-    ch_id = message.forward_from_chat.id
-    ch_title = message.forward_from_chat.title
-    safe_link = get_safe_channel_link(ch_id) or "Private ID Stored"
-    
-    clean_screen(
-        message.chat.id,
-        f"💡 <b>Chat ID Info Extracted Successfully!</b>\n\n"
-        f"📌 <b>Title:</b> {ch_title}\n"
-        f"🤖 <b>Type:</b> Requested Group/Channel\n"
-        f"🆔 <b>Chat ID:</b> <code>{ch_id}</code>\n"
-        f"🔗 <b>Safe Link:</b> <code>{safe_link}</code>\n\n"
-        f"<i>Copied automatically! You can paste this ID anytime.</i>"
-    )
-
 # ================= MULTI-BOT CLUSTER ENGINE =================
 active_worker_threads = {}
 
@@ -415,8 +397,30 @@ def get_random_worker():
 
 def common_file_delivery_handler(bot_instance, message, current_bot_username):
     u = message.chat.id
-    col_users.update_one({"user_id": u}, {"$set": {"user_id": u}}, upsert=True)
-    
+    name = message.from_user.first_name or "𝐔ɴᴋɴᴏᴡɴ"
+    username = message.from_user.username or "𝐍/𝐀"
+    lang = message.from_user.language_code or "ᴇɴ"
+
+    # Save user data for broadcast
+    existing_user = col_users.find_one({"user_id": u})
+    if not existing_user:
+        col_users.update_one({"user_id": u}, {"$set": {"user_id": u}}, upsert=True)
+        total = col_users.count_documents({})
+        try:
+            master_bot.send_message(
+                chat_id=OWNER_ID,
+                text=f"""<b>🚨 𝐍𝐄𝐖 𝐔𝐒𝐄𝐑 𝐀𝐋𝐄𝐑𝐓!</b>
+━━━━━━━━━━━━━━━━━━
+👤 <b>𝐍ᴀᴍᴇ:</b> {name}
+🔤 <b>𝐔ꜱᴇʀɴᴀᴍᴇ:</b> @{username}
+🆔 <b>𝐈𝐃:</b> <code>{u}</code>
+━━━━━━━━━━━━━━━━━━
+📈 <i>𝐓ᴏᴛᴀʟ 𝐔ꜱᴇʀꜱ: {total}</i>""",
+                parse_mode="html"
+            )
+        except Exception:
+            pass
+
     parts = (message.text or "").split(" ")
     start_param = parts[1] if len(parts) > 1 else ""
 
@@ -482,11 +486,6 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
 
         if ep_doc and series:
             files = ep_doc.get("files", {})
-            current_num = int(ep_doc.get("ep_num", "1"))
-
-            prev_ep = col_episodes.find_one({"series_id": series["_id"], "ep_num": str(current_num - 1).zfill(2)})
-            next_ep = col_episodes.find_one({"series_id": series["_id"], "ep_num": str(current_num + 1).zfill(2)})
-
             kb = types.InlineKeyboardMarkup()
             row1 = []
             if files.get('480p'):
@@ -520,18 +519,77 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             bot_instance.send_photo(u, photo=series.get("poster"), caption=caption, reply_markup=kb)
             return
 
-    brand = get_setting("brand_name")
-    kb = types.InlineKeyboardMarkup()
-    if is_admin(u):
-        kb.add(StyledInlineKeyboardButton(text="⚙️ Admin Control Hub", callback_data="admin_hub", style="danger"))
-    kb.add(StyledInlineKeyboardButton(text="ℹ️ How to Download", callback_data="user_help", style="primary"))
-    kb.add(StyledInlineKeyboardButton(text="👑 VIP Membership", callback_data="user_vip_info", style="success"))
-    kb.add(StyledInlineKeyboardButton(text="⛩️ Official Updates Channel", url="https://t.me/ongoing_anime_by_zeno", style="primary"))
+    # Advanced ID Bot /start Menu Layout
+    text = f"""<b>💎 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎 𝐀𝐃𝐕𝐀𝐍𝐂𝐄𝐃 𝐈𝐃 𝐁𝐎𝐓 💎</b>
+
+🆔 <b>𝐘ᴏᴜʀ 𝐈𝐃:</b>   <code>{u}</code>
+👤 <b>𝐍ᴀᴍᴇ:</b>      {name}
+🔤 <b>𝐔ꜱᴇʀɴᴀᴍᴇ:</b>  @{username}
+🗣️ <b>𝐋ᴀɴɢᴜᴀɢᴇ:</b>  {lang.upper()}
+🌟 <b>𝐒ᴛᴀᴛᴜꜱ:</b>    𝐏ʀᴇᴍɪᴜᴍ 𝐔ꜱᴇʀ 💗
+
+━━━━━━━━━━━━━━━━━━
+💡 <b>𝐇ᴏᴡ 𝐓𝐨 𝐔ꜱᴇ 𝐓ʜɪꜱ 𝐁ᴏᴛ?</b>
+𝐈ɴ ᴛʜɪꜱ ʙᴏᴛ, ʏᴏᴜ ᴄᴀɴ ᴇᴀꜱɪʟʏ ʀᴇᴛʀɪᴇᴠᴇ ᴛʜᴇ ᴄʜᴀᴛ 𝐈𝐃 ᴏꜰ ᴀɴʏ 𝐔ꜱᴇʀ, 𝐁ᴏᴛ, 𝐆ʀᴏᴜᴘ, ᴏʀ 𝐂ʜᴀɴɴᴇʟ!
+
+<b>𝐂ʜᴏᴏꜱᴇ 𝐀ɴ 𝐎ᴘᴛɪᴏɴ 𝐁ᴇʟᴏᴡ:</b>
+1️⃣ <i>𝐔ꜱᴇ ᴛʜᴇ ꜱᴍᴀʀᴛ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ</i> 👇
+2️⃣ <i>𝐅ᴏʀᴡᴀʀᴅ ᴀɴʏ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴍᴇ</i> 📩
+━━━━━━━━━━━━━━━━━━"""
+
+    reply_keyboard = {
+        "keyboard": [
+            [
+                {"text": "👤 𝐒ᴇʟᴇᴄᴛ 𝐔ꜱᴇʀꜱ", "request_users": {"request_id": 1, "user_is_bot": False, "request_name": True}},
+                {"text": "🤖 𝐒ᴇʟᴇᴄᴛ 𝐁ᴏᴛꜱ", "request_users": {"request_id": 2, "user_is_bot": True, "request_name": True}}
+            ],
+            [
+                {"text": "📢 𝐒ᴇʟᴇᴄᴛ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 3, "chat_is_channel": True, "request_title": True}}
+            ],
+            [
+                {"text": "🔒 𝐏ʀɪᴠᴀᴛᴇ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 4, "chat_is_channel": True, "chat_has_username": False, "request_title": True}},
+                {"text": "🌐 𝐏ᴜʙʟɪᴄ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 5, "chat_is_channel": True, "chat_has_username": True, "request_title": True}}
+            ],
+            [
+                {"text": "👥 𝐒ᴇʟᴇᴄᴛ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 6, "chat_is_channel": False, "request_title": True}}
+            ],
+            [
+                {"text": "🔒 𝐏ʀɪᴠᴀᴛᴇ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 7, "chat_is_channel": False, "chat_has_username": False, "request_title": True}},
+                {"text": "🌐 𝐏ᴜʙʟɪᴄ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 8, "chat_is_channel": False, "chat_has_username": True, "request_title": True}}
+            ],
+            [
+                {"text": "🌟 𝐒ᴇʟᴇᴄᴛ 𝐏ʀᴇᴍɪᴜᴍ 𝐔ꜱᴇʀꜱ", "request_users": {"request_id": 9, "user_is_premium": True, "request_name": True}}
+            ],
+            [
+                {"text": "🛡️ 𝐀ᴅᴍɪɴ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 10, "chat_is_channel": False, "chat_is_created": True, "request_title": True}},
+                {"text": "🛡️ 𝐀ᴅᴍɪɴ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 11, "chat_is_channel": True, "chat_is_created": True, "request_title": True}}
+            ]
+        ],
+        "resize_keyboard": True
+    }
     
+    # If admin, append Admin Control Hub button to keyboard or show via reply markup
+    if is_admin(u):
+        reply_keyboard["keyboard"].append([{"text": "⚙️ Admin Control Hub"}])
+
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    for row in reply_keyboard["keyboard"]:
+        btn_row = []
+        for btn_dict in row:
+            if "request_users" in btn_dict:
+                req = btn_dict["request_users"]
+                btn_row.append(types.KeyboardButton(text=btn_dict["text"], request_users=types.KeyboardButtonRequestUsers(request_id=req["request_id"], user_is_bot=req.get("user_is_bot"), user_is_premium=req.get("user_is_premium"), request_name=req.get("request_name"))))
+            elif "request_chat" in btn_dict:
+                req = btn_dict["request_chat"]
+                btn_row.append(types.KeyboardButton(text=btn_dict["text"], request_chat=types.KeyboardButtonRequestChat(request_id=req["request_id"], chat_is_channel=req["chat_is_channel"], chat_has_username=req.get("chat_has_username"), chat_is_created=req.get("chat_is_created"), request_title=req.get("request_title"))))
+            else:
+                btn_row.append(types.KeyboardButton(text=btn_dict["text"]))
+        markup.row(*btn_row)
+
     bot_instance.send_message(
-        u,
-        f"👋 <b>Welcome to Ongoing Anime Delivery Hub!</b>\n\nCluster worker online for lightning speed file delivery.\n\n✦ <b>Powered by:</b> {brand}",
-        reply_markup=kb
+        chat_id=u,
+        text=text,
+        reply_markup=markup
     )
 
 def start_worker_bot_instance(token, username):
@@ -541,6 +599,11 @@ def start_worker_bot_instance(token, username):
         @worker.message_handler(commands=["start"])
         def worker_start(msg):
             common_file_delivery_handler(worker, msg, username)
+
+        @worker.message_handler(func=lambda msg: msg.text == "⚙️ Admin Control Hub")
+        def worker_admin_hub(msg):
+            if is_admin(msg.chat.id):
+                show_admin_panel(msg.chat.id)
 
         @worker.callback_query_handler(func=lambda c: c.data.startswith("retry_"))
         def worker_retry(call):
@@ -571,11 +634,64 @@ def initialize_all_workers():
 
 threading.Thread(target=initialize_all_workers, daemon=True).start()
 
-# ================= MASTER BOT USER /START =================
+# ================= MASTER BOT HANDLERS =================
 @master_bot.message_handler(commands=["start"])
 def handle_master_start(message):
     remove_user_msg(message)
     common_file_delivery_handler(master_bot, message, get_master_username())
+
+@master_bot.message_handler(func=lambda msg: msg.text == "⚙️ Admin Control Hub")
+def handle_text_admin_hub(message):
+    remove_user_msg(message)
+    if is_admin(message.chat.id):
+        show_admin_panel(message.chat.id)
+
+# Handle Shared Users & Chats from Custom ID Keyboard
+@master_bot.message_handler(content_types=['user_shared', 'users_shared', 'chat_shared'])
+def handle_shared_content(message):
+    u = message.chat.id
+    if hasattr(message, 'user_shared') and message.user_shared:
+        shared_uid = message.user_shared.user_id
+        master_bot.send_message(
+            chat_id=u,
+            text=f"<b>✅ 𝐈𝐃 𝐄xᴛʀᴀᴄᴛᴇᴅ 𝐒ᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!</b>\n━━━━━━━━━━━━━━━━━━\n👤 <b>𝐓ʏᴘᴇ:</b> 𝐑ᴇǫᴜᴇꜱᴛᴇᴅ 𝐔ꜱᴇʀ/𝐁ᴏᴛ\n🆔 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{shared_uid}</code>\n━━━━━━━━━━━━━━━━━━"
+        )
+    elif hasattr(message, 'users_shared') and message.users_shared:
+        try:
+            shared_uid = message.users_shared.users[0].user_id
+            master_bot.send_message(
+                chat_id=u,
+                text=f"<b>✅ 𝐈𝐃 𝐄xᴛʀᴀᴄᴛᴇᴅ 𝐒ᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!</b>\n━━━━━━━━━━━━━━━━━━\n👤 <b>𝐓ʏᴘᴇ:</b> 𝐑ᴇǫᴜᴇꜱᴛᴇᴅ 𝐔ꜱᴇʀ/𝐁ᴏᴛ\n🆔 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{shared_uid}</code>\n━━━━━━━━━━━━━━━━━━"
+            )
+        except Exception:
+            pass
+    elif hasattr(message, 'chat_shared') and message.chat_shared:
+        shared_cid = message.chat_shared.chat_id
+        master_bot.send_message(
+            chat_id=u,
+            text=f"<b>✅ 𝐈𝐃 𝐄xᴛʀᴀᴄᴛᴇᴅ 𝐒ᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!</b>\n━━━━━━━━━━━━━━━━━━\n📢 <b>𝐓ʏᴘᴇ:</b> 𝐑ᴇǫᴜᴇꜱᴛᴇᴅ 𝐆ʀᴏᴜᴘ/𝐂ʜᴀɴɴᴇʟ\n🆔 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{shared_cid}</code>\n━━━━━━━━━━━━━━━━━━"
+        )
+
+# Handle Forwarded Messages for ID Extraction
+@master_bot.message_handler(func=lambda msg: msg.forward_from is not None or msg.forward_from_chat is not None)
+def handle_forwarded_id_extraction(message):
+    remove_user_msg(message)
+    u = message.chat.id
+    if message.forward_from:
+        f_name = message.forward_from.first_name or "𝐔ɴᴋɴᴏᴡɴ"
+        f_id = message.forward_from.id
+        master_bot.send_message(
+            chat_id=u,
+            text=f"<b>✅ 𝐅ᴏʀᴡᴀʀᴅᴇᴅ 𝐈𝐃 𝐅ᴏᴜɴᴅ!</b>\n━━━━━━━━━━━━━━━━━━\n👤 <b>𝐍ᴀᴍᴇ:</b> {f_name}\n🆔 <b>𝐔ꜱᴇʀ 𝐈𝐃:</b> <code>{f_id}</code>\n━━━━━━━━━━━━━━━━━━"
+        )
+    elif message.forward_from_chat:
+        c_title = message.forward_from_chat.title or "𝐔ɴᴋɴᴏᴡɴ"
+        c_type = message.forward_from_chat.type.capitalize()
+        c_id = message.forward_from_chat.id
+        master_bot.send_message(
+            chat_id=u,
+            text=f"<b>✅ 𝐅ᴏʀᴡᴀʀᴅᴇᴅ 𝐈𝐃 𝐅ᴏᴜɴᴅ!</b>\n━━━━━━━━━━━━━━━━━━\n📢 <b>𝐓ɪᴛʟᴇ:</b> {c_title}\n📝 <b>𝐓ʏᴘᴇ:</b> {c_type}\n🆔 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{c_id}</code>\n━━━━━━━━━━━━━━━━━━"
+        )
 
 @master_bot.callback_query_handler(func=lambda c: c.data == "user_vip_info")
 def handle_vip_info_cb(call):
@@ -835,12 +951,10 @@ def handle_rebroadcast_single_episode(call):
 
     files = ep.get("files", {})
 
-    # 1. Main Channel Keyboard (Only "⛩️ Download Now ⛩️" button)
     main_kb = types.InlineKeyboardMarkup()
     if series_dl_link:
         main_kb.add(StyledInlineKeyboardButton(text="⛩️ ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏᴡ ⛩️", url=series_dl_link, style="success"))
 
-    # 2. Particular Series Channel Keyboard (480p | 720p | 1080p and HDRip below)
     part_kb = types.InlineKeyboardMarkup()
     w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
     
@@ -874,7 +988,6 @@ def handle_rebroadcast_single_episode(call):
         f"✦ <i>High speed direct download links are live below!</i>"
     )
 
-    # Resolve Main Channel
     if main_channel_id:
         try:
             success, resolved_main, _, _, err = resolve_channel_input(main_channel_id)
@@ -886,7 +999,6 @@ def handle_rebroadcast_single_episode(call):
         except Exception as e:
             notify_admin_error("Main Channel Broadcast Error (Single Ep)", e)
 
-    # Resolve Particular Channel
     if raw_series_ch:
         try:
             success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
@@ -943,12 +1055,10 @@ def handle_series_completion_rebroadcast(call):
 
     files = ep_doc.get("files", {})
 
-    # Main Channel KB
     main_kb = types.InlineKeyboardMarkup()
     if series_dl_link:
         main_kb.add(StyledInlineKeyboardButton(text="⛩️ ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏᴡ ⛩️", url=series_dl_link, style="success"))
 
-    # Particular Channel KB (480p | 720p | 1080p and HDRip below)
     part_kb = types.InlineKeyboardMarkup()
     w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
     
@@ -982,7 +1092,6 @@ def handle_series_completion_rebroadcast(call):
 
     poster = series.get("poster")
     
-    # Broadcast to Main Channel
     if main_ch:
         try:
             success, resolved_main, _, _, err = resolve_channel_input(main_ch)
@@ -994,7 +1103,6 @@ def handle_series_completion_rebroadcast(call):
         except Exception as e:
             notify_admin_error("Main Channel Broadcast Error (Series Complete)", e)
 
-    # Broadcast to Particular Channel
     if raw_series_ch:
         try:
             success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
@@ -1398,13 +1506,11 @@ def publish_episode_broadcast(call):
 
     files = ep_data.get("files", {})
     
-    # 1. Main Channel Keyboard (Only "⛩️ Download Now ⛩️" button)
     main_kb = types.InlineKeyboardMarkup()
     series_dl_link = series.get("target_channel_link")
     if series_dl_link:
         main_kb.add(StyledInlineKeyboardButton(text="⛩️ ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏᴡ ⛩️", url=series_dl_link, style="success"))
 
-    # 2. Particular Series Channel Keyboard (480p | 720p | 1080p and HDRip below)
     part_kb = types.InlineKeyboardMarkup()
     w1, w2, w3, w4 = clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker()), clean_bot_username(get_random_worker())
     
@@ -1442,7 +1548,6 @@ def publish_episode_broadcast(call):
     poster = series.get("poster")
     raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
 
-    # Send to Main Channel
     if main_ch:
         try:
             success, resolved_main, _, _, err = resolve_channel_input(main_ch)
@@ -1454,7 +1559,6 @@ def publish_episode_broadcast(call):
         except Exception as e:
             notify_admin_error("Main Channel Publish Error", e)
 
-    # Send to Particular Series Channel
     if raw_series_ch:
         try:
             success, resolved_id, _, _, err = resolve_channel_input(raw_series_ch)
@@ -1844,7 +1948,7 @@ def perform_rich_broadcast(message):
     if "|" in caption_text:
         lines = caption_text.split("\n")
         last_line = lines[-1]
-        if "|" in last_line:
+        if "|" in last_link if 'last_link' in locals() else "|":
             b_parts = last_line.split("|")
             btn_markup = types.InlineKeyboardMarkup()
             btn_markup.add(StyledInlineKeyboardButton(text=b_parts[0].strip(), url=b_parts[1].strip(), style="primary"))
