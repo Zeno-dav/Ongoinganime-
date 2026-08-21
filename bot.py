@@ -153,6 +153,15 @@ def is_vip(user_id):
         return True
     return vip_entry.get("expires_at", 0) > time.time()
 
+# ================= CHANNEL SELECTOR REPLY KEYBOARD =================
+def get_channel_request_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.row(
+        types.KeyboardButton(text="📢 Select Channel", request_chat=types.KeyboardButtonRequestChat(request_id=3, chat_is_channel=True, request_title=True)),
+        types.KeyboardButton(text="👥 Select Group", request_chat=types.KeyboardButtonRequestChat(request_id=6, chat_is_channel=False, request_title=True))
+    )
+    return markup
+
 # ================= SMART CHANNEL RESOLVER & ERROR NOTIFIER =================
 def get_safe_channel_link(chat_identifier):
     if not chat_identifier:
@@ -519,77 +528,32 @@ def common_file_delivery_handler(bot_instance, message, current_bot_username):
             bot_instance.send_photo(u, photo=series.get("poster"), caption=caption, reply_markup=kb)
             return
 
-    # Advanced ID Bot /start Menu Layout
-    text = f"""<b>💎 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎 𝐀𝐃𝐕𝐀𝐍𝐂𝐄𝐃 𝐈𝐃 𝐁𝐎𝐓 💎</b>
+    # Clean Anime Bot /start Menu Layout
+    text = f"""<b>✨ 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎 𝐎𝐍𝐆𝐎𝐈𝐍𝐆 𝐀𝐍𝐈𝐌𝐄 𝐁𝐎𝐓 ✨</b>
 
 🆔 <b>𝐘ᴏᴜʀ 𝐈𝐃:</b>   <code>{u}</code>
 👤 <b>𝐍ᴀᴍᴇ:</b>      {name}
 🔤 <b>𝐔ꜱᴇʀɴᴀᴍᴇ:</b>  @{username}
 🗣️ <b>𝐋ᴀɴɢᴜᴀɢᴇ:</b>  {lang.upper()}
-🌟 <b>𝐒ᴛᴀᴛᴜꜱ:</b>    𝐏ʀᴇᴍɪᴜᴍ 𝐔ꜱᴇʀ 💗
+🌟 <b>𝐒ᴛᴀᴛᴜꜱ:</b>    {'👑 𝐕𝐈𝐏 𝐌ᴇᴍʙᴇʀ' if is_vip(u) else '👤 𝐅ʀᴇᴇ 𝐔ꜱᴇʀ'}
 
 ━━━━━━━━━━━━━━━━━━
-💡 <b>𝐇ᴏᴡ 𝐓𝐨 𝐔ꜱᴇ 𝐓ʜɪꜱ 𝐁ᴏᴛ?</b>
-𝐈ɴ ᴛʜɪꜱ ʙᴏᴛ, ʏᴏᴜ ᴄᴀɴ ᴇᴀꜱɪʟʏ ʀᴇᴛʀɪᴇᴠᴇ ᴛʜᴇ ᴄʜᴀᴛ 𝐈𝐃 ᴏꜰ ᴀɴʏ 𝐔ꜱᴇʀ, 𝐁ᴏᴛ, 𝐆ʀᴏᴜᴘ, ᴏʀ 𝐂ʜᴀɴɴᴇʟ!
-
-<b>𝐂ʜᴏᴏꜱᴇ 𝐀ɴ 𝐎ᴘᴛɪᴏɴ 𝐁ᴇʟᴏᴡ:</b>
-1️⃣ <i>𝐔ꜱᴇ ᴛʜᴇ ꜱᴍᴀʀᴛ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ</i> 👇
-2️⃣ <i>𝐅ᴏʀᴡᴀʀᴅ ᴀɴʏ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴍᴇ</i> 📩
+🎬 <i>Yahan aapko sabhi latest ongoing aur completed anime episodes high-speed mein milenge!</i>
 ━━━━━━━━━━━━━━━━━━"""
 
-    reply_keyboard = {
-        "keyboard": [
-            [
-                {"text": "👤 𝐒ᴇʟᴇᴄᴛ 𝐔ꜱᴇʀꜱ", "request_users": {"request_id": 1, "user_is_bot": False, "request_name": True}},
-                {"text": "🤖 𝐒ᴇʟᴇᴄᴛ 𝐁ᴏᴛꜱ", "request_users": {"request_id": 2, "user_is_bot": True, "request_name": True}}
-            ],
-            [
-                {"text": "📢 𝐒ᴇʟᴇᴄᴛ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 3, "chat_is_channel": True, "request_title": True}}
-            ],
-            [
-                {"text": "🔒 𝐏ʀɪᴠᴀᴛᴇ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 4, "chat_is_channel": True, "chat_has_username": False, "request_title": True}},
-                {"text": "🌐 𝐏ᴜʙʟɪᴄ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 5, "chat_is_channel": True, "chat_has_username": True, "request_title": True}}
-            ],
-            [
-                {"text": "👥 𝐒ᴇʟᴇᴄᴛ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 6, "chat_is_channel": False, "request_title": True}}
-            ],
-            [
-                {"text": "🔒 𝐏ʀɪᴠᴀᴛᴇ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 7, "chat_is_channel": False, "chat_has_username": False, "request_title": True}},
-                {"text": "🌐 𝐏ᴜʙʟɪᴄ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 8, "chat_is_channel": False, "chat_has_username": True, "request_title": True}}
-            ],
-            [
-                {"text": "🌟 𝐒ᴇʟᴇᴄᴛ 𝐏ʀᴇᴍɪᴜᴍ 𝐔ꜱᴇʀꜱ", "request_users": {"request_id": 9, "user_is_premium": True, "request_name": True}}
-            ],
-            [
-                {"text": "🛡️ 𝐀ᴅᴍɪɴ 𝐆ʀᴏᴜᴘꜱ", "request_chat": {"request_id": 10, "chat_is_channel": False, "chat_is_created": True, "request_title": True}},
-                {"text": "🛡️ 𝐀ᴅᴍɪɴ 𝐂ʜᴀɴɴᴇʟꜱ", "request_chat": {"request_id": 11, "chat_is_channel": True, "chat_is_created": True, "request_title": True}}
-            ]
-        ],
-        "resize_keyboard": True
-    }
-    
-    # If admin, append Admin Control Hub button to keyboard or show via reply markup
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        StyledInlineKeyboardButton(text="👑 VIP Hub", callback_data="user_vip_info", style="primary"),
+        StyledInlineKeyboardButton(text="📖 Help & Guide", callback_data="user_help", style="primary")
+    )
     if is_admin(u):
-        reply_keyboard["keyboard"].append([{"text": "⚙️ Admin Control Hub"}])
-
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for row in reply_keyboard["keyboard"]:
-        btn_row = []
-        for btn_dict in row:
-            if "request_users" in btn_dict:
-                req = btn_dict["request_users"]
-                btn_row.append(types.KeyboardButton(text=btn_dict["text"], request_users=types.KeyboardButtonRequestUsers(request_id=req["request_id"], user_is_bot=req.get("user_is_bot"), user_is_premium=req.get("user_is_premium"), request_name=req.get("request_name"))))
-            elif "request_chat" in btn_dict:
-                req = btn_dict["request_chat"]
-                btn_row.append(types.KeyboardButton(text=btn_dict["text"], request_chat=types.KeyboardButtonRequestChat(request_id=req["request_id"], chat_is_channel=req["chat_is_channel"], chat_has_username=req.get("chat_has_username"), chat_is_created=req.get("chat_is_created"), request_title=req.get("request_title"))))
-            else:
-                btn_row.append(types.KeyboardButton(text=btn_dict["text"]))
-        markup.row(*btn_row)
+        markup.add(StyledInlineKeyboardButton(text="⚙️ Admin Control Hub", callback_data="admin_hub", style="success"))
 
     bot_instance.send_message(
         chat_id=u,
         text=text,
-        reply_markup=markup
+        reply_markup=markup,
+        parse_mode="HTML"
     )
 
 def start_worker_bot_instance(token, username):
@@ -646,33 +610,16 @@ def handle_text_admin_hub(message):
     if is_admin(message.chat.id):
         show_admin_panel(message.chat.id)
 
-# Handle Shared Users & Chats from Custom ID Keyboard
 @master_bot.message_handler(content_types=['user_shared', 'users_shared', 'chat_shared'])
 def handle_shared_content(message):
     u = message.chat.id
-    if hasattr(message, 'user_shared') and message.user_shared:
-        shared_uid = message.user_shared.user_id
-        master_bot.send_message(
-            chat_id=u,
-            text=f"<b>✅ 𝐈𝐃 𝐄xᴛʀᴀᴄᴛᴇᴅ 𝐒ᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!</b>\n━━━━━━━━━━━━━━━━━━\n👤 <b>𝐓ʏᴘᴇ:</b> 𝐑ᴇǫᴜᴇꜱᴛᴇᴅ 𝐔ꜱᴇʀ/𝐁ᴏᴛ\n🆔 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{shared_uid}</code>\n━━━━━━━━━━━━━━━━━━"
-        )
-    elif hasattr(message, 'users_shared') and message.users_shared:
-        try:
-            shared_uid = message.users_shared.users[0].user_id
-            master_bot.send_message(
-                chat_id=u,
-                text=f"<b>✅ 𝐈𝐃 𝐄xᴛʀᴀᴄᴛᴇᴅ 𝐒ᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!</b>\n━━━━━━━━━━━━━━━━━━\n👤 <b>𝐓ʏᴘᴇ:</b> 𝐑ᴇǫᴜᴇꜱᴛᴇᴅ 𝐔ꜱᴇʀ/𝐁ᴏᴛ\n🆔 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{shared_uid}</code>\n━━━━━━━━━━━━━━━━━━"
-            )
-        except Exception:
-            pass
-    elif hasattr(message, 'chat_shared') and message.chat_shared:
+    if hasattr(message, 'chat_shared') and message.chat_shared:
         shared_cid = message.chat_shared.chat_id
         master_bot.send_message(
             chat_id=u,
-            text=f"<b>✅ 𝐈𝐃 𝐄xᴛʀᴀᴄᴛᴇᴅ 𝐒ᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!</b>\n━━━━━━━━━━━━━━━━━━\n📢 <b>𝐓ʏᴘᴇ:</b> 𝐑ᴇǫᴜᴇꜱᴛᴇᴅ 𝐆ʀᴏᴜᴘ/𝐂ʜᴀɴɴᴇʟ\n🆔 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{shared_cid}</code>\n━━━━━━━━━━━━━━━━━━"
+            text=f"<b>✅ 𝐈𝐃 𝐄xᴛʀᴀᴄᴛᴇᴅ 𝐒ᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!</b>\n━━━━━━━━━━━━━━━━━━\n📢 <b>𝐂ʜᴀᴛ 𝐈𝐃:</b> <code>{shared_cid}</code>\n━━━━━━━━━━━━━━━━━━"
         )
 
-# Handle Forwarded Messages for ID Extraction
 @master_bot.message_handler(func=lambda msg: msg.forward_from is not None or msg.forward_from_chat is not None)
 def handle_forwarded_id_extraction(message):
     remove_user_msg(message)
@@ -794,7 +741,7 @@ def handle_series_hub_list(call):
 
     kb = types.InlineKeyboardMarkup(row_width=1)
     for s in series_list:
-        ch_tag = f" ➔ [{s.get('target_channel_title', 'No Channel')}]"
+        ch_tag = f" ➔ [BroadCast: {s.get('broadcast_channel_id', 'None')}]"
         kb.add(StyledInlineKeyboardButton(text=f"📺 {s['title']}{ch_tag}", callback_data=f"view_s_{s['_id']}", style="primary"))
     kb.add(StyledInlineKeyboardButton(text="🔙 Back", callback_data="admin_hub", style="danger"))
     clean_screen(u, "📺 <b>Series Hub:</b> Select a series to view, edit, or manage:", reply_markup=kb)
@@ -813,8 +760,8 @@ def view_series_details(call):
     safe_title = html.escape(str(series['title']))
     styled_title = to_bold_serif(safe_title)
     
-    t_ch = series.get("target_channel_title", "Global Channel")
-    t_link = series.get("target_channel_link", "Not Configured")
+    b_ch = series.get("broadcast_channel_id", "Not Configured")
+    dl_link = series.get("download_button_link", "Not Configured")
 
     caption = (
         f"✦ <b>{styled_title}</b>\n"
@@ -823,8 +770,8 @@ def view_series_details(call):
         f"▶ <b>sᴇᴀsᴏɴ :</b> {html.escape(str(series.get('season', '01')))}\n"
         f"▶ <b>ᴛᴏᴛᴀʟ ᴇᴘɪsᴏᴅᴇs :</b> {ep_count}\n"
         f"▶ <b>ᴀᴜᴅɪᴏ :</b> {html.escape(str(series.get('audio', 'Japanese [Eng-Sub]')))}\n"
-        f"▶ <b>ᴄʜᴀɴɴᴇʟ ᴛɪᴛʟᴇ :</b> <code>{html.escape(str(t_ch))}</code>\n"
-        f"▶ <b>ᴅᴏᴡɴʟᴏᴀᴅ ʟɪɴᴋ :</b> <code>{html.escape(str(t_link))}</code>\n"
+        f"▶ <b>ʙʀᴏᴀᴅᴄᴀsᴛ ᴄʜᴀɴɴᴇʟ ɪᴅ :</b> <code>{html.escape(str(b_ch))}</code>\n"
+        f"▶ <b>ᴅᴏᴡɴʟᴏᴀᴅ ʙᴜᴛᴛᴏɴ ʟɪɴᴋ :</b> <code>{html.escape(str(dl_link))}</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━━"
     )
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -943,11 +890,10 @@ def handle_rebroadcast_single_episode(call):
     season = series.get("season", "01")
     ep_num = ep.get("ep_num", "01")
     audio = series.get("audio", "Japanese [Eng-Sub]")
-    ep_id = str(ep["_id"])
 
     main_channel_id = get_setting("main_channel_id")
-    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
-    series_dl_link = series.get("target_channel_link")
+    raw_series_ch = series.get("broadcast_channel_id", "")
+    series_dl_link = series.get("download_button_link", "")
 
     files = ep.get("files", {})
 
@@ -1047,8 +993,8 @@ def handle_series_completion_rebroadcast(call):
 
     main_ch = get_setting("main_channel_id")
     brand = get_setting("brand_name")
-    series_dl_link = series.get("target_channel_link")
-    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
+    series_dl_link = series.get("download_button_link", "")
+    raw_series_ch = series.get("broadcast_channel_id", "")
 
     safe_title = html.escape(str(series['title']))
     styled_title = to_bold_serif(safe_title)
@@ -1133,7 +1079,8 @@ def show_edit_series_menu(call):
         StyledInlineKeyboardButton(text="📝 Edit Title", callback_data=f"ed_f_{sid}_title", style="primary"),
         StyledInlineKeyboardButton(text="🔢 Edit Season Number", callback_data=f"ed_f_{sid}_season", style="primary"),
         StyledInlineKeyboardButton(text="🔊 Edit Audio / Language", callback_data=f"ed_f_{sid}_audio", style="primary"),
-        StyledInlineKeyboardButton(text="🔗 Edit Series Channel & Download Link", callback_data=f"ed_f_{sid}_link", style="primary"),
+        StyledInlineKeyboardButton(text="📢 Edit Broadcast Channel ID", callback_data=f"ed_f_{sid}_broadcast_channel_id", style="primary"),
+        StyledInlineKeyboardButton(text="🔗 Edit Download Button Link", callback_data=f"ed_f_{sid}_download_button_link", style="primary"),
         StyledInlineKeyboardButton(text="🖼️ Change Poster Photo", callback_data=f"ed_f_{sid}_poster", style="primary"),
         StyledInlineKeyboardButton(text="🔙 Back to Series", callback_data=f"view_s_{sid}", style="danger")
     )
@@ -1151,11 +1098,17 @@ def start_edit_series_field(call):
         "title": "📝 Send new Anime Title:",
         "season": "🔢 Send new Season Number (e.g. <code>01</code>):",
         "audio": "🔊 Send new Audio/Language (e.g. <code>Japanese [Eng-Sub]</code>):",
-        "link": "🔗 Send new Series Channel Invite Link or Username (e.g. <code>https://t.me/+bfskh...</code>):",
+        "broadcast_channel_id": "📢 Send new Broadcast Channel ID/Username (Ya neeche button se select karein):",
+        "download_button_link": "🔗 Send new Download Button Link for Main Channel:",
         "poster": "🖼️ Send new Poster Photo for this series:"
     }
 
-    msg = clean_screen(u, field_prompts.get(field, "Send new value:"))
+    if field == "broadcast_channel_id":
+        msg = master_bot.send_message(u, field_prompts.get(field), reply_markup=get_channel_request_keyboard(), parse_mode="HTML")
+        track_message(u, msg.message_id)
+    else:
+        msg = clean_screen(u, field_prompts.get(field, "Send new value:"))
+    
     master_bot.register_next_step_handler(msg, step_save_edited_field)
 
 def step_save_edited_field(message):
@@ -1171,25 +1124,15 @@ def step_save_edited_field(message):
             show_admin_panel(u)
             return
         col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"poster": message.photo[-1].file_id}})
-    elif field == "link":
-        success, cid, title, safe_link, err = resolve_channel_input(message.text)
-        if success:
-            col_series.update_one(
-                {"_id": ObjectId(sid)},
-                {"$set": {
-                    "target_channel_id": cid,
-                    "target_channel_title": title,
-                    "target_channel_link": safe_link
-                }}
-            )
-        else:
-            clean_screen(u, f"{err}\n\nUpdate failed.")
-            show_admin_panel(u)
-            return
+    elif field == "broadcast_channel_id":
+        val = str(message.chat_shared.chat_id) if (hasattr(message, 'chat_shared') and message.chat_shared) else (message.text.strip() if message.text else "")
+        col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"broadcast_channel_id": val}})
+    elif field == "download_button_link":
+        col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"download_button_link": message.text.strip() if message.text else ""}})
     elif field == "season":
-        col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"season": str(message.text.strip()).zfill(2)}})
+        col_series.update_one({"_id": ObjectId(sid)}, {"$set": {"season": str(message.text.strip()).zfill(2) if message.text else "01"}})
     else:
-        col_series.update_one({"_id": ObjectId(sid)}, {"$set": {field: message.text.strip()}})
+        col_series.update_one({"_id": ObjectId(sid)}, {"$set": {field: message.text.strip() if message.text else ""}})
 
     clean_screen(u, "✅ <b>Series Updated Successfully!</b>")
     show_admin_panel(u)
@@ -1285,14 +1228,16 @@ def step_execute_anilist_fetch(message):
         "temp_series.poster": poster_url
     })
 
-    msg = clean_screen(
+    msg = master_bot.send_message(
         u,
         f"🎬 <b>AniList Fetched:</b> {anime_title}\n\n"
-        f"🔗 <b>Send Specific Channel Link/ID for this Anime (Download Button Link):</b>\n"
-        f"Example: <code>https://t.me/your_channel</code> or <code>-100...</code>\n\n"
-        f"<i>(Send <code>/skip</code> if you want to set it later)</i>"
+        f"📢 <b>Send Broadcast Channel ID/Username for this Series:</b>\n"
+        f"(Ya neeche diye gaye button se channel select karein)",
+        reply_markup=get_channel_request_keyboard(),
+        parse_mode="HTML"
     )
-    master_bot.register_next_step_handler(msg, step_save_series_channel_initial)
+    track_message(u, msg.message_id)
+    master_bot.register_next_step_handler(msg, step_save_series_broadcast_ch)
 
 @master_bot.callback_query_handler(func=lambda c: c.data == "add_s_manual")
 def start_manual_add_series(call):
@@ -1335,30 +1280,41 @@ def step_series_poster(message):
 
     poster_id = message.photo[-1].file_id
     update_session(u, {"temp_series.poster": poster_id})
+
+    msg = master_bot.send_message(
+        u,
+        "📢 <b>Send Broadcast Channel ID/Username for this Series:</b>\n\n"
+        "Example: <code>-100...</code> or <code>@channel</code>\n"
+        "<i>(Ya neeche button se select karein)</i>",
+        reply_markup=get_channel_request_keyboard(),
+        parse_mode="HTML"
+    )
+    track_message(u, msg.message_id)
+    master_bot.register_next_step_handler(msg, step_save_series_broadcast_ch)
+
+def step_save_series_broadcast_ch(message):
+    remove_user_msg(message)
+    u = message.chat.id
+    if hasattr(message, 'chat_shared') and message.chat_shared:
+        b_cid = str(message.chat_shared.chat_id)
+    else:
+        b_cid = message.text.strip() if message.text else ""
+        
+    update_session(u, {"temp_series.broadcast_channel_id": b_cid})
+
     msg = clean_screen(
         u,
-        "🔗 <b>Send Specific Channel Link/ID for this Anime (Download Button Link):</b>\n\n"
-        "Example: <code>https://t.me/your_channel</code> or <code>-100...</code>\n"
-        "<i>(Send <code>/skip</code> if you want to set it later)</i>"
+        "🔗 <b>Send Download Button Link for this Series:</b>\n"
+        "(Yeh link Main Channel ke broadcast mein 'Download Now' button ke andar lagega)"
     )
-    master_bot.register_next_step_handler(msg, step_save_series_channel_initial)
+    master_bot.register_next_step_handler(msg, step_save_series_final_db)
 
-def step_save_series_channel_initial(message):
+def step_save_series_final_db(message):
     remove_user_msg(message)
     u = message.chat.id
     temp = get_session(u).get("temp_series", {})
-
-    target_cid = ""
-    target_title = "Global Channel"
-    target_link = ""
-
-    txt = message.text.strip()
-    if txt != "/skip":
-        success, cid, title, safe_link, err = resolve_channel_input(txt)
-        if success:
-            target_cid = cid
-            target_title = title
-            target_link = safe_link
+    txt = message.text.strip() if message.text else ""
+    dl_link = txt
 
     col_series.insert_one({
         "title": temp.get("title", "Unknown"),
@@ -1366,9 +1322,8 @@ def step_save_series_channel_initial(message):
         "status": "ONGOING",
         "audio": temp.get("audio", "Japanese [Eng-Sub]"),
         "poster": temp.get("poster"),
-        "target_channel_id": target_cid,
-        "target_channel_title": target_title,
-        "target_channel_link": target_link,
+        "broadcast_channel_id": temp.get("broadcast_channel_id", ""),
+        "download_button_link": dl_link,
         "created_at": time.time()
     })
 
@@ -1377,7 +1332,8 @@ def step_save_series_channel_initial(message):
         f"✅ <b>Series Added Successfully!</b>\n\n"
         f"📌 <b>Title:</b> {temp.get('title')}\n"
         f"⚡ <b>Season:</b> {temp.get('season')}\n"
-        f"🔗 <b>Download Channel Link:</b> <code>{target_link or 'Not Set'}</code>"
+        f"📢 <b>Broadcast Channel ID:</b> <code>{temp.get('broadcast_channel_id') or 'Not Set'}</code>\n"
+        f"🔗 <b>Download Button Link:</b> <code>{dl_link or 'Not Set'}</code>"
     )
     show_admin_panel(u)
 
@@ -1493,7 +1449,7 @@ def publish_episode_broadcast(call):
         clean_screen(u, "❌ Incomplete data. Upload cancelled.")
         return
 
-    ep_res = col_episodes.insert_one({
+    col_episodes.insert_one({
         "series_id": series["_id"],
         "ep_num": ep_data["ep_num"],
         "files": ep_data["files"],
@@ -1501,13 +1457,10 @@ def publish_episode_broadcast(call):
     })
 
     main_ch = get_setting("main_channel_id")
-    brand = get_setting("brand_name")
-    ep_id = str(ep_res.inserted_id)
-
     files = ep_data.get("files", {})
     
     main_kb = types.InlineKeyboardMarkup()
-    series_dl_link = series.get("target_channel_link")
+    series_dl_link = series.get("download_button_link", "")
     if series_dl_link:
         main_kb.add(StyledInlineKeyboardButton(text="⛩️ ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏᴡ ⛩️", url=series_dl_link, style="success"))
 
@@ -1546,7 +1499,7 @@ def publish_episode_broadcast(call):
     )
 
     poster = series.get("poster")
-    raw_series_ch = series.get("target_channel_id") or series.get("series_channel_id")
+    raw_series_ch = series.get("broadcast_channel_id", "")
 
     if main_ch:
         try:
@@ -1570,7 +1523,7 @@ def publish_episode_broadcast(call):
         except Exception as e:
             notify_admin_error("Particular Channel Publish Error", e)
 
-    clean_screen(u, f"✅ <b>Published successfully to Main Channel & Particular Channel!</b>")
+    clean_screen(u, f"✅ <b>Published successfully to Main Channel & Broadcast Channel!</b>")
     show_admin_panel(u)
 
 # ================= BATCH EPISODE UPLOADER =================
@@ -1780,12 +1733,23 @@ def start_edit_brand(call):
 @master_bot.callback_query_handler(func=lambda c: c.data == "edit_main_ch")
 def start_edit_main_ch(call):
     master_bot.answer_callback_query(call.id)
-    msg = clean_screen(call.message.chat.id, "📢 <b>Send Main Channel Username or Numeric ID:</b>")
+    msg = master_bot.send_message(
+        call.message.chat.id,
+        "📢 <b>Send Main Channel Username or Numeric ID:</b>\n<i>(Ya neeche diye gaye button se channel select karein)</i>",
+        reply_markup=get_channel_request_keyboard(),
+        parse_mode="HTML"
+    )
+    track_message(call.message.chat.id, msg.message_id)
     master_bot.register_next_step_handler(msg, step_save_main_ch)
 
 def step_save_main_ch(message):
     remove_user_msg(message)
-    success, cid, title, safe_link, err = resolve_channel_input(message.text)
+    if hasattr(message, 'chat_shared') and message.chat_shared:
+        raw_val = str(message.chat_shared.chat_id)
+    else:
+        raw_val = message.text.strip() if message.text else ""
+        
+    success, cid, title, safe_link, err = resolve_channel_input(raw_val)
     if success:
         update_setting("main_channel_id", cid)
         clean_screen(message.chat.id, f"✅ Main Channel Set: {title}")
@@ -1948,7 +1912,7 @@ def perform_rich_broadcast(message):
     if "|" in caption_text:
         lines = caption_text.split("\n")
         last_line = lines[-1]
-        if "|" in last_link if 'last_link' in locals() else "|":
+        if "|" in last_line:
             b_parts = last_line.split("|")
             btn_markup = types.InlineKeyboardMarkup()
             btn_markup.add(StyledInlineKeyboardButton(text=b_parts[0].strip(), url=b_parts[1].strip(), style="primary"))
